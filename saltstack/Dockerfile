@@ -4,7 +4,7 @@ FROM debian:12
 # Set the root password
 RUN echo 'root:testme' | chpasswd
 
-# Update the package list and install dependencies
+# Update the package list and install dependencies, including Python
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -12,25 +12,20 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     ca-certificates \
     procps \
-    openssh-server
+    openssh-server \
+    sudo \
+    sshpass \
+    python3 \
+    python3-pip
 
 # Create the privilege separation directory
 RUN mkdir -p /run/sshd
 
-# Create the keyrings directory
-RUN mkdir -p /etc/apt/keyrings
-
-# Add the SaltStack repository key
-RUN curl -fsSL -o /etc/apt/keyrings/salt-archive-keyring-2023.gpg https://repo.saltproject.io/salt/py3/debian/12/amd64/SALT-PROJECT-GPG-PUBKEY-2023.gpg
-
-# Add the SaltStack repository
-RUN echo "deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64] https://repo.saltproject.io/salt/py3/debian/12/amd64/latest bookworm main" > /etc/apt/sources.list.d/salt.list
-
-# Update the package list and install Salt Master
-RUN apt-get update && apt-get install -y salt-master
+# Create a user for Ansible with sudo privileges
+RUN useradd -m -s /bin/bash ansible && echo 'ansible:ansible' | chpasswd && adduser ansible sudo
 
 # Expose the necessary ports
-EXPOSE 4505 4506 22
+EXPOSE 22
 
 # Copy SSH server configuration
 COPY sshd_config /etc/ssh/sshd_config
@@ -41,5 +36,5 @@ COPY start_services.sh /usr/local/bin/start_services.sh
 # Set execute permission for the startup script
 RUN chmod +x /usr/local/bin/start_services.sh
 
-# Start SSH and Salt Master services using the startup script
+# Start SSH service using the startup script
 CMD ["/usr/local/bin/start_services.sh"]

@@ -1,0 +1,13 @@
+- name: Install SaltStack Master from official packages on Debian
+  hosts: all
+  become: true
+  become_method: sudo
+  become_user: root
+  vars:
+    saltstack_version: "3004"
+  roles:
+    - role: saltstack_master_from_official_on_debian
+      vars:
+        saltstack_version: "{{ saltstack_version }}"
+      tags:
+        - install

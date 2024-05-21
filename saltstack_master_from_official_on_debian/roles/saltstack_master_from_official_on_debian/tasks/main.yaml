@@ -1,0 +1,43 @@
+---
+- name: Ensure SaltStack repository key is added
+  command:
+    cmd: mkdir -p /etc/apt/keyrings
+  become: yes
+
+- name: Add SaltStack repository key
+  command:
+    cmd: curl -fsSL -o /etc/apt/keyrings/salt-archive-keyring-2023.gpg https://repo.saltproject.io/salt/py3/debian/12/amd64/SALT-PROJECT-GPG-PUBKEY-2023.gpg
+  become: yes
+
+- name: Ensure SaltStack repository is added
+  apt_repository:
+    repo: 'deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64] https://repo.saltproject.io/salt/py3/debian/12/amd64/3007 bookworm main'
+    state: present
+  become: yes
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  become: yes
+
+- name: Install SaltStack Master
+  apt:
+    name: salt-master
+    state: present
+  become: yes
+
+- name: Ensure SaltStack Master is running and enabled (SysVinit)
+  service:
+    name: salt-master
+    state: started
+    enabled: yes
+  become: yes
+  when: ansible_service_mgr == 'sysvinit'
+
+- name: Ensure SaltStack Master is running and enabled (Systemd)
+  systemd:
+    name: salt-master
+    state: started
+    enabled: yes
+  become: yes
+  when: ansible_service_mgr == 'systemd'
