@@ -7,6 +7,9 @@ ANSIBLE_USER="ansible"
 ANSIBLE_PASSWORD="ansible"
 SSH_PORT=2222
 
+# Линтер
+ansible-lint playbook.yaml
+
 # Получение IP-адреса контейнера
 HOST_IP="127.0.0.1"
 echo "Host IP = $HOST_IP"

@@ -4,38 +4,45 @@
   become_user: root
   tasks:
     - name: Ensure SaltStack repository key directory exists
-      file:
+      ansible.builtin.file:
         path: /etc/apt/keyrings
         state: directory
+        mode: '0755'
 
     - name: Ensure SaltStack repository key is added
       ansible.builtin.get_url:
         url: https://repo.saltproject.io/salt/py3/debian/12/amd64/SALT-PROJECT-GPG-PUBKEY-2023.gpg
         dest: /etc/apt/keyrings/salt-archive-keyring-2023.gpg
+        mode: '0644'
 
     - name: Add SaltStack repository
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64] https://repo.saltproject.io/salt/py3/debian/12/amd64/latest bookworm main"
+        repo: >
+          deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64]
+          https://repo.saltproject.io/salt/py3/debian/12/amd64/latest bookworm main
         state: present
         filename: salt.list
 
     - name: Update apt cache
       ansible.builtin.apt:
-        update_cache: yes
+        update_cache: true
 
     - name: Install SaltStack Master
       ansible.builtin.apt:
         name: salt-master
         state: present
-        update_cache: yes
+        update_cache: true
 
     - name: Check if SaltStack Master is installed
-      ansible.builtin.shell: dpkg -l | grep salt-master
+      ansible.builtin.shell: |
+        set -o pipefail
+        dpkg -l | grep salt-master
       register: salt_master_installed
-      ignore_errors: yes
+      changed_when: false
+      failed_when: false
 
     - name: Check if systemd is used
-      stat:
+      ansible.builtin.stat:
         path: /run/systemd/system
       register: systemd_used
 
@@ -43,20 +50,23 @@
       ansible.builtin.service:
         name: salt-master
         state: started
-        enabled: yes
+        enabled: true
       when: systemd_used.stat.exists
 
     - name: Ensure SaltStack Master is running and enabled (SysVinit)
-      ansible.builtin.shell: service salt-master start
+      ansible.builtin.service:
+        name: salt-master
+        state: started
+        enabled: true
       when: not systemd_used.stat.exists and salt_master_installed.rc == 0
-      ignore_errors: yes
+      failed_when: false
 
     - name: Start SaltStack Master directly if no service manager is available
       ansible.builtin.shell: |
         nohup salt-master -d > /var/log/salt/master &
       when: not systemd_used.stat.exists and salt_master_installed.rc == 0
-      ignore_errors: yes
+      changed_when: false
 
     - name: Debug info - Show service file status
-      debug:
+      ansible.builtin.debug:
         msg: "Systemd used: {{ systemd_used.stat.exists }}"
