@@ -1,8 +1,0 @@
-nginx_from_source_on_ubuntu_workdir_path: /var/www/html
-nginx_from_source_on_ubuntu_sbin_path: /usr/sbin/nginx
-nginx_from_source_on_ubuntu_conffile_path: /etc/nginx/nginx.conf
-nginx_from_source_on_ubuntu_logfile_path: /var/log/nginx/access.log
-nginx_from_source_on_ubuntu_errlogfile_path: /var/log/nginx/error.log
-nginx_from_source_on_ubuntu_lockfile_path: /var/lock/nginx.lock
-nginx_from_source_on_ubuntu_pidfile_path: /var/run/nginx.pid
-nginx_from_source_on_ubuntu_modulesdir_path: /etc/nginx/modules

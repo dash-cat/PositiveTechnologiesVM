@@ -25,19 +25,3 @@
     name: salt-master
     state: present
   become: yes
-
-- name: Ensure SaltStack Master is running and enabled (SysVinit)
-  service:
-    name: salt-master
-    state: started
-    enabled: yes
-  become: yes
-  when: ansible_service_mgr == 'sysvinit'
-
-- name: Ensure SaltStack Master is running and enabled (Systemd)
-  systemd:
-    name: salt-master
-    state: started
-    enabled: yes
-  become: yes
-  when: ansible_service_mgr == 'systemd'

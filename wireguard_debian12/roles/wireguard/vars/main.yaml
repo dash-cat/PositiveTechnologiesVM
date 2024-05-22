@@ -1,0 +1,3 @@
+wg_address: "10.0.0.1/24"
+wg_allowed_ips: "0.0.0.0/0"
+wg_endpoint: "your.endpoint.com:51820"
