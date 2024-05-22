@@ -21,8 +21,15 @@
     mode: '0700'
 
 - name: Generate WireGuard private key
-  ansible.builtin.command: "bash -c 'wg genkey | tee /etc/wireguard/privatekey'"
+  ansible.builtin.command: "wg genkey"
   register: wg_private_key_output
+  changed_when: "'privatekey' not in wg_private_key_output.stdout"
+
+- name: Save WireGuard private key to file
+  ansible.builtin.copy:
+    content: "{{ wg_private_key_output.stdout }}"
+    dest: /etc/wireguard/privatekey
+    mode: '0600'
   changed_when: "'privatekey' not in wg_private_key_output.stdout"
 
 - name: Set WireGuard private key
@@ -30,8 +37,15 @@
     wg_private_key: "{{ wg_private_key_output.stdout }}"
 
 - name: Generate WireGuard public key
-  ansible.builtin.command: "bash -c 'echo {{ wg_private_key_output.stdout }} | wg pubkey | tee /etc/wireguard/publickey'"
+  ansible.builtin.command: "echo {{ wg_private_key }} | wg pubkey"
   register: wg_public_key_output
+  changed_when: "'publickey' not in wg_public_key_output.stdout"
+
+- name: Save WireGuard public key to file
+  ansible.builtin.copy:
+    content: "{{ wg_public_key_output.stdout }}"
+    dest: /etc/wireguard/publickey
+    mode: '0600'
   changed_when: "'publickey' not in wg_public_key_output.stdout"
 
 - name: Set WireGuard public key
@@ -44,3 +58,9 @@
     dest: /etc/wireguard/keys
     mode: '0600'
   notify: Restart WireGuard
+
+- name: Ensure WireGuard is enabled and started
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: started
+    enabled: true
