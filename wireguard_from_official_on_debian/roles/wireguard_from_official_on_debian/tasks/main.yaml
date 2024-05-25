@@ -2,7 +2,6 @@
 - name: Ensure the system is updated
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: 3600
 
 - name: Install WireGuard
   ansible.builtin.apt:
@@ -21,46 +20,71 @@
     mode: '0700'
 
 - name: Generate WireGuard private key
-  ansible.builtin.command: "wg genkey"
-  register: wg_private_key_output
-  changed_when: "'privatekey' not in wg_private_key_output.stdout"
+  ansible.builtin.command:
+    cmd: wg genkey
+  register: private_key_result
+  changed_when: false
 
 - name: Save WireGuard private key to file
   ansible.builtin.copy:
-    content: "{{ wg_private_key_output.stdout }}"
+    content: "{{ private_key_result.stdout }}"
     dest: /etc/wireguard/privatekey
     mode: '0600'
-  changed_when: "'privatekey' not in wg_private_key_output.stdout"
 
 - name: Set WireGuard private key
   ansible.builtin.set_fact:
-    wg_private_key: "{{ wg_private_key_output.stdout }}"
+    wg_private_key: "{{ private_key_result.stdout }}"
 
 - name: Generate WireGuard public key
-  ansible.builtin.command: "echo {{ wg_private_key }} | wg pubkey"
-  register: wg_public_key_output
-  changed_when: "'publickey' not in wg_public_key_output.stdout"
+  ansible.builtin.command:
+    cmd: "echo {{ wg_private_key }} | wg pubkey"
+  register: public_key_result
+  changed_when: false
 
 - name: Save WireGuard public key to file
   ansible.builtin.copy:
-    content: "{{ wg_public_key_output.stdout }}"
+    content: "{{ public_key_result.stdout }}"
     dest: /etc/wireguard/publickey
     mode: '0600'
-  changed_when: "'publickey' not in wg_public_key_output.stdout"
 
 - name: Set WireGuard public key
   ansible.builtin.set_fact:
-    wg_public_key: "{{ wg_public_key_output.stdout }}"
+    wg_public_key: "{{ public_key_result.stdout }}"
 
-- name: Save WireGuard keys to file
-  ansible.builtin.copy:
-    content: "PrivateKey: {{ wg_private_key }}\nPublicKey: {{ wg_public_key }}"
-    dest: /etc/wireguard/keys
+- name: Create WireGuard configuration file
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
     mode: '0600'
-  notify: Restart WireGuard
 
 - name: Ensure WireGuard is enabled and started
-  ansible.builtin.service:
+  ansible.builtin.systemd:
     name: wg-quick@wg0
-    state: started
     enabled: true
+    state: started
+  register: wg_service_result
+  failed_when: wg_service_result.failed
+
+- name: Check WireGuard service status if failed
+  ansible.builtin.command:
+    cmd: systemctl status wg-quick@wg0
+  when: wg_service_result.failed
+  register: service_status
+  changed_when: false
+
+- name: Debug WireGuard service status
+  ansible.builtin.debug:
+    var: service_status.stdout
+  when: wg_service_result.failed
+
+- name: Check WireGuard service logs if failed
+  ansible.builtin.command:
+    cmd: journalctl -xeu wg-quick@wg0
+  when: wg_service_result.failed
+  register: service_logs
+  changed_when: false
+
+- name: Debug WireGuard service logs
+  ansible.builtin.debug:
+    var: service_logs.stdout
+  when: wg_service_result.failed

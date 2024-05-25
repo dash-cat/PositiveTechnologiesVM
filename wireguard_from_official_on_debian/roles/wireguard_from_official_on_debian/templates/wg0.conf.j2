@@ -1,8 +1,10 @@
 [Interface]
-PrivateKey = {{ wg_private_key.stdout }}
-Address = {{ wg_address }}
+Address = {{ wireguard_from_official_on_debian_wg_address }}
+ListenPort = {{ wireguard_from_official_on_debian_wg_listen_port }}
+PrivateKey = {{ wg_private_key }}
 
 [Peer]
-PublicKey = {{ wg_public_key.stdout }}
-AllowedIPs = {{ wg_allowed_ips }}
-Endpoint = {{ wg_endpoint }}
+PublicKey = {{ wg_public_key }}
+AllowedIPs = {{ wireguard_from_official_on_debian_wg_allowed_ips }}
+Endpoint = {{ wireguard_from_official_on_debian_wg_endpoint }}
+PersistentKeepalive = {{ wireguard_from_official_on_debian_wg_persistent_keepalive }}
