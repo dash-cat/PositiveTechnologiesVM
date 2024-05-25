@@ -20,38 +20,34 @@
     mode: '0700'
 
 - name: Generate WireGuard private key
-  ansible.builtin.command:
-    cmd: wg genkey
+  ansible.builtin.shell:
+    cmd: umask 0077 && wg genkey > /etc/wireguard/privatekey
   register: private_key_result
   changed_when: false
 
-- name: Save WireGuard private key to file
-  ansible.builtin.copy:
-    content: "{{ private_key_result.stdout }}"
-    dest: /etc/wireguard/privatekey
-    mode: '0600'
-
-- name: Set WireGuard private key
-  ansible.builtin.set_fact:
-    wg_private_key: "{{ private_key_result.stdout }}"
-
-- name: Generate WireGuard public key
-  ansible.builtin.command:
-    cmd: "echo {{ wg_private_key }} | wg pubkey"
-  register: public_key_result
+- name: Read private key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/privatekey
+  register: private_key_content
   changed_when: false
 
-- name: Save WireGuard public key to file
-  ansible.builtin.copy:
-    content: "{{ public_key_result.stdout }}"
-    dest: /etc/wireguard/publickey
-    mode: '0600'
+- name: Generate WireGuard public key
+  ansible.builtin.shell:
+    cmd: wg pubkey < /etc/wireguard/privatekey > /etc/wireguard/publickey
+  changed_when: false
 
-- name: Set WireGuard public key
+- name: Read public key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/publickey
+  register: public_key_content
+  changed_when: false
+
+- name: Set WireGuard keys as facts
   ansible.builtin.set_fact:
-    wg_public_key: "{{ public_key_result.stdout }}"
+    wg_private_key: "{{ private_key_content.content | b64decode }}"
+    wg_public_key: "{{ public_key_content.content | b64decode }}"
 
-- name: Create WireGuard configuration file
+- name: Create WireGuard configuration file from template
   ansible.builtin.template:
     src: wg0.conf.j2
     dest: /etc/wireguard/wg0.conf
@@ -64,27 +60,3 @@
     state: started
   register: wg_service_result
   failed_when: wg_service_result.failed
-
-- name: Check WireGuard service status if failed
-  ansible.builtin.command:
-    cmd: systemctl status wg-quick@wg0
-  when: wg_service_result.failed
-  register: service_status
-  changed_when: false
-
-- name: Debug WireGuard service status
-  ansible.builtin.debug:
-    var: service_status.stdout
-  when: wg_service_result.failed
-
-- name: Check WireGuard service logs if failed
-  ansible.builtin.command:
-    cmd: journalctl -xeu wg-quick@wg0
-  when: wg_service_result.failed
-  register: service_logs
-  changed_when: false
-
-- name: Debug WireGuard service logs
-  ansible.builtin.debug:
-    var: service_logs.stdout
-  when: wg_service_result.failed

@@ -3,4 +3,4 @@
   hosts: localhost
   become: true
   roles:
-    - wireguard_from_official_on_debian
+    - role: wireguard_from_official_on_debian
