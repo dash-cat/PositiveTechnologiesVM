@@ -23,10 +23,13 @@ for i in {1..10}; do
 done
 
 # Создание файла инвентаря
-echo "[debian_container]
-${HOST_IP} ansible_user=${ANSIBLE_USER} ansible_password=${ANSIBLE_PASSWORD} ansible_sudo_pass=${ANSIBLE_PASSWORD} ansible_port=${SSH_PORT} ansible_python_interpreter=/usr/bin/python3 ansible_ssh_common_args='-o StrictHostKeyChecking=no'" > inventory.ini
+cat <<EOL > inventory.ini
+[debian_container]
+${HOST_IP} ansible_user=${ANSIBLE_USER} ansible_password=${ANSIBLE_PASSWORD} ansible_sudo_pass=${ANSIBLE_PASSWORD} ansible_port=${SSH_PORT} ansible_python_interpreter=/usr/bin/python3 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+EOL
 
 # Запуск Ansible playbook
-ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ./playbook.yaml
-
-
+ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ./playbook.yaml -v

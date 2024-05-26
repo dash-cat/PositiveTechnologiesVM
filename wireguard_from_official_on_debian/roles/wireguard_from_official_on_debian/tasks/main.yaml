@@ -1,0 +1,62 @@
+---
+- name: Ensure the system is updated
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: wireguard
+    state: present
+
+- name: Install WireGuard tools
+  ansible.builtin.apt:
+    name: wireguard-tools
+    state: present
+
+- name: Ensure WireGuard configuration directory exists
+  ansible.builtin.file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+
+- name: Generate WireGuard private key
+  ansible.builtin.shell:
+    cmd: umask 0077 && wg genkey > /etc/wireguard/privatekey
+  register: private_key_result
+  changed_when: false
+
+- name: Read private key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/privatekey
+  register: private_key_content
+  changed_when: false
+
+- name: Generate WireGuard public key
+  ansible.builtin.shell:
+    cmd: wg pubkey < /etc/wireguard/privatekey > /etc/wireguard/publickey
+  changed_when: false
+
+- name: Read public key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/publickey
+  register: public_key_content
+  changed_when: false
+
+- name: Set WireGuard keys as facts
+  ansible.builtin.set_fact:
+    wg_private_key: "{{ private_key_content.content | b64decode }}"
+    wg_public_key: "{{ public_key_content.content | b64decode }}"
+
+- name: Create WireGuard configuration file from template
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: '0600'
+
+- name: Ensure WireGuard is enabled and started
+  ansible.builtin.systemd:
+    name: wg-quick@wg0
+    enabled: true
+    state: started
+  register: wg_service_result
+  failed_when: wg_service_result.failed

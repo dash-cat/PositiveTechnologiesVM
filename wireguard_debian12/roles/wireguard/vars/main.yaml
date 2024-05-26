@@ -1,4 +1,0 @@
----
-wireguard_wg_address: "10.0.0.1/24"
-wireguard_wg_allowed_ips: "10.0.0.0/24"
-wireguard_wg_endpoint: "your.vpn.server:51820"

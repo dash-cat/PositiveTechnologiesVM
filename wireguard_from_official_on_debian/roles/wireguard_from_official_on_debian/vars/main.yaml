@@ -1,0 +1,6 @@
+wireguard_from_official_on_debian_wg_interface: wg0
+wireguard_from_official_on_debian_wg_address: 192.168.2.1/24
+wireguard_from_official_on_debian_wg_listen_port: 51820
+wireguard_from_official_on_debian_wg_allowed_ips: 192.168.2.2/32
+wireguard_from_official_on_debian_wg_endpoint: 10.0.2.16:51821
+wireguard_from_official_on_debian_wg_persistent_keepalive: 25
