@@ -8,6 +8,8 @@ FILES_TO_COPY=(
   "detect.py"
   "oval_vars.xml.j2"
   "requirements.txt"
+  "../data/saltstack_master_from_official_on_debian.json"
+  "../data/wireguard_from_official_on_debian.json"
 )
 REMOTE_PATH="/home/ansible/"
 
