@@ -6,7 +6,7 @@ from typing import Dict, Optional, List
 from jinja2 import Environment, FileSystemLoader
 
 # Set up command line argument parsing
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Detect installed software.')
 parser.add_argument('config_path', type=str, help='The path to the config.json file')
 args = parser.parse_args()
 
