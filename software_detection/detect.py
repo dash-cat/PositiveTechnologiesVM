@@ -2,7 +2,7 @@ import os
 import re
 import json
 import argparse
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from jinja2 import Environment, FileSystemLoader
 
 # Set up command line argument parsing
@@ -24,7 +24,7 @@ package_fields_need_eq = {
 }
 soft_name = application_name
 
-version_re = r'([\d.]+)-.+'
+version_res = [r'([\d.]+)-.+', r'([\d.]+)']
 oval_vars_template_file = 'oval_vars.xml.j2'
 oval_vars_file = 'oval_vars.xml'
 
@@ -53,16 +53,18 @@ if __name__ == '__main__':
             package = p
             break
 
-    # Extract version using regex
+    # Extract version using multiple regexes
     context = {
         'name': None,
         'version': None
     }
     if package:
         package_version = package.get('version', '')
-        result = re.search(version_re, package_version)
-        if result:
-            context['version'] = result.groups()[0]
+        for version_re in version_res:
+            result = re.search(version_re, package_version)
+            if result:
+                context['version'] = result.groups()[0]
+                break
 
     if context['version']:
         context['name'] = soft_name
