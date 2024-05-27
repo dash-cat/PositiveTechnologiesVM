@@ -4,7 +4,11 @@ SSH_HOST="localhost"
 SSH_PORT=2222
 SSH_USER="ansible"
 
-FILES_TO_COPY=("detect.py" "oval_vars.xml.j2" "requirements.txt")
+FILES_TO_COPY=(
+  "detect.py"
+  "oval_vars.xml.j2"
+  "requirements.txt"
+)
 REMOTE_PATH="/home/ansible/"
 
 echoed() {

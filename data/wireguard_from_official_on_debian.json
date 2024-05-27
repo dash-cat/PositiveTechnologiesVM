@@ -1,4 +1,6 @@
 {
     "name": "wireguard",
+    "package": "wireguard",
+    "manufacturer": "wireguard",
     "maintainer": "Daniel Kahn Gillmor <dkg@fifthhorseman.net>"
 }
