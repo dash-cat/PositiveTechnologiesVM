@@ -1,0 +1,7 @@
+{
+    "name": "saltstack",
+    "package": "salt-master",
+    "manufacturer": "jenkins",
+    "maintainer": "Debian Salt Team <pkg-salt-team@lists.alioth.debian.org>"
+}
+  

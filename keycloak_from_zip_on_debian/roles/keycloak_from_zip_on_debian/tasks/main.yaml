@@ -1,0 +1,85 @@
+---
+- name: Ensure dependencies are installed
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - unzip
+    - openjdk-17-jdk
+    - postgresql
+    - python3-psycopg2  # Add psycopg2 library
+  register: apt_result
+  retries: 3
+  delay: 5
+  until: apt_result is succeeded
+
+- name: Ensure PostgreSQL service is started
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+
+- name: Set PostgreSQL password for 'postgres' user
+  ansible.builtin.shell: |
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ postgres_password }}';"
+
+- name: Create Keycloak database
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: keycloak
+
+- name: Create Keycloak database user
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: keycloak
+    password: "{{ postgres_password }}"
+    priv: "ALL"
+    db: keycloak
+    role_attr_flags: LOGIN
+
+- name: Allow local connections to PostgreSQL
+  lineinfile:
+    path: /etc/postgresql/15/main/pg_hba.conf
+    regexp: '^host\s+all\s+all\s+127\.0\.0\.1/32\s+'
+    line: 'host    all             all             127.0.0.1/32            md5'
+
+- name: Restart PostgreSQL to apply changes
+  service:
+    name: postgresql
+    state: restarted
+
+- name: Download Keycloak ZIP archive
+  get_url:
+    url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.zip"
+    dest: "/tmp/keycloak-{{ keycloak_version }}.zip"
+
+- name: Create Keycloak installation directory
+  file:
+    path: "{{ keycloak_install_dir }}"
+    state: directory
+
+- name: Extract Keycloak ZIP archive
+  unarchive:
+    src: "/tmp/keycloak-{{ keycloak_version }}.zip"
+    dest: "{{ keycloak_install_dir }}"
+    remote_src: yes
+
+- name: Start Keycloak
+  shell: |
+    nohup {{ keycloak_install_dir }}/keycloak-{{ keycloak_version }}/bin/kc.sh start-dev --hostname={{ keycloak_hostname }} > /opt/keycloak/keycloak.log 2>&1 &
+  async: 30
+  poll: 0
+  changed_when: false
+  register: keycloak_start
+
+- name: Wait for Keycloak to start
+  wait_for:
+    port: 8080
+    delay: 10
+    timeout: 300
+    state: started
+
+- name: Cleanup downloaded files
+  file:
+    path: "/tmp/keycloak-{{ keycloak_version }}.zip"
+    state: absent
