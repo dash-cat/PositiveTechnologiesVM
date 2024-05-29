@@ -5,10 +5,11 @@ SSH_PORT=2222
 SSH_USER="ansible"
 
 FILES_TO_COPY=(
-  "detect.py"
-  "oval_vars.xml.j2"
-  "requirements.txt"
-  "../data/keycloak_from_zip_on_debian.json"
+  "software_detection/detect.py"
+  "software_detection/oval_vars.xml.j2"
+  "software_detection/requirements.txt"
+  "data/keycloak_from_zip_on_debian.json"
+  "data/strongswan_from_tar_on_debian.json"
 )
 REMOTE_PATH="/home/ansible/"
 

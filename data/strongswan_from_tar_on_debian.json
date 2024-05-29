@@ -3,5 +3,9 @@
     "detect": {
         "type": "shell",
         "command": "/usr/local/sbin/swanctl | grep -oP 'strongSwan \\K[\\d.]+'"
-    } 
+    },
+    "cpe": {
+        "app": "strongswan",
+        "manufacturer": "strongswan"
+    }
 }
