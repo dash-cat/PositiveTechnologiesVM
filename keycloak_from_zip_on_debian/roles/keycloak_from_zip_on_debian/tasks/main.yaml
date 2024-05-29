@@ -18,24 +18,38 @@
     name: postgresql
     state: started
     enabled: yes
-
 - name: Set PostgreSQL password for 'postgres' user
   ansible.builtin.shell: |
     sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ postgres_password }}';"
 
 - name: Create Keycloak database
-  become_user: postgres
   community.postgresql.postgresql_db:
     name: keycloak
+    state: present
+  become: yes
+  become_user: postgres
+
+- name: Ensure PostgreSQL is listening on all interfaces
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/15/main/postgresql.conf
+    regexp: "^#?listen_addresses ="
+    line: "listen_addresses = '*'"
+  become: yes
+  become_user: postgres
+
+- name: Set ACL for postgresql.conf
+  ansible.builtin.command: setfacl -m u:postgres:r-x /etc/postgresql/15/main/postgresql.conf
+  become: yes
 
 - name: Create Keycloak database user
-  become_user: postgres
   community.postgresql.postgresql_user:
     name: keycloak
     password: "{{ postgres_password }}"
     priv: "ALL"
     db: keycloak
     role_attr_flags: LOGIN
+  become: yes
+  become_user: postgres
 
 - name: Allow local connections to PostgreSQL
   lineinfile:
