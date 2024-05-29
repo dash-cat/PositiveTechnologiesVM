@@ -8,7 +8,7 @@ FILES_TO_COPY=(
   "detect.py"
   "oval_vars.xml.j2"
   "requirements.txt"
-  "../data/strongswan_from_tar_on_debian.json"
+  "../data/keycloak_from_zip_on_debian.json"
 )
 REMOTE_PATH="/home/ansible/"
 
