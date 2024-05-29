@@ -43,7 +43,7 @@ ansible_python_interpreter=/usr/bin/python3
 EOL
 
 # Запуск Ansible playbook
-ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ${PLAYBOOK_PATH} 
+ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ${PLAYBOOK_PATH} -vvv
 
 #  umask 77 && mkdir -p \"` echo /home/ansible/.ansible/tmp `\"&& mkdir \"` echo /home/ansible/.ansible/tmp/ansible-tmp-1716973304.9806573-4129973-70004313624527 `\" && echo ansible-tmp-1716973304.9806573-4129973-70004313624527=\"` echo /home/ansible/.ansible/tmp/ansible-tmp-1716973304.9806573-4129973-70004313624527 `\" 
 
