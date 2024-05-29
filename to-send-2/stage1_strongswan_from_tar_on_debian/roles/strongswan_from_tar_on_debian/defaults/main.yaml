@@ -1,0 +1,3 @@
+---
+strongswan_from_tar_on_debian_strongswan_version: "5.9.8"
+strongswan_from_tar_on_debian_install_dir: "/opt/strongswan"

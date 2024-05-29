@@ -1,0 +1,88 @@
+---
+- name: Ensure dependencies are installed
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - unzip
+    - openjdk-17-jdk
+    - postgresql
+    - python3-psycopg2
+  register: apt_result
+  retries: 3
+  delay: 5
+  until: apt_result is succeeded
+
+- name: Ensure PostgreSQL service is started
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Set PostgreSQL password for 'postgres' user
+  ansible.builtin.shell: |
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}';"
+  become: true
+  changed_when: false
+
+- name: Create Keycloak database
+  community.postgresql.postgresql_db:
+    name: keycloak
+    state: present
+    login_user: postgres
+    login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    login_host: localhost
+
+- name: Create Keycloak database user
+  community.postgresql.postgresql_user:
+    name: keycloak
+    password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    priv: "ALL"
+    db: keycloak
+    role_attr_flags: LOGIN
+    login_user: postgres
+    login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    login_host: localhost
+
+- name: Allow local connections to PostgreSQL
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/15/main/pg_hba.conf
+    regexp: '^host\s+all\s+all\s+127\.0\.0\.1/32\s+'
+    line: 'host    all             all             127.0.0.1/32            md5'
+
+- name: Restart PostgreSQL to apply changes
+  ansible.builtin.service:
+    name: postgresql
+    state: restarted
+
+- name: Download Keycloak ZIP archive
+  ansible.builtin.get_url:
+    url: >
+      {{ [
+        'https://github.com/keycloak/keycloak/releases/download/',
+        keycloak_from_zip_on_debian_keycloak_version,
+        '/keycloak-',
+        keycloak_from_zip_on_debian_keycloak_version,
+        '.zip'
+      ] | join('') }}
+    dest: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    mode: '0644'
+  become: true
+
+- name: Create Keycloak installation directory
+  ansible.builtin.file:
+    path: "{{ keycloak_from_zip_on_debian_keycloak_install_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Extract Keycloak ZIP archive
+  ansible.builtin.unarchive:
+    src: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    dest: "{{ keycloak_from_zip_on_debian_keycloak_install_dir }}"
+    remote_src: true
+
+- name: Cleanup downloaded files
+  ansible.builtin.file:
+    path: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    state: absent
