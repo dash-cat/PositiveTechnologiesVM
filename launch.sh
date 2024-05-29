@@ -25,14 +25,6 @@ ansible-lint ${PLAYBOOK_PATH}
 HOST_IP="127.0.0.1"
 echo "Host IP = $HOST_IP"
 
-# Проверка подключения по SSH вручную
-echo "Проверка подключения по SSH..."
-for i in {1..10}; do
-    sshpass -p ${ANSIBLE_PASSWORD} ssh -o StrictHostKeyChecking=no -p ${SSH_PORT} ${ANSIBLE_USER}@${HOST_IP} "echo SSH подключение успешно" && break
-    echo "Повторная попытка подключения через 5 секунд..."
-    sleep 5
-done
-
 # Создание файла инвентаря
 cat <<EOL > inventory.ini
 [debian_container]
