@@ -58,8 +58,9 @@
     priv: "ALL"
     db: keycloak
     role_attr_flags: LOGIN
-  become: true
-  become_user: postgres
+    login_user: postgres
+    login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    login_host: localhost
 
 - name: Allow local connections to PostgreSQL
   ansible.builtin.lineinfile:
