@@ -57,7 +57,14 @@
 
 - name: Download Keycloak ZIP archive
   ansible.builtin.get_url:
-    url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_from_zip_on_debian_keycloak_version }}/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    url: >
+      {{ [
+        'https://github.com/keycloak/keycloak/releases/download/',
+        keycloak_from_zip_on_debian_keycloak_version,
+        '/keycloak-',
+        keycloak_from_zip_on_debian_keycloak_version,
+        '.zip'
+      ] | join('') }}
     dest: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
     mode: '0644'
   become: true
