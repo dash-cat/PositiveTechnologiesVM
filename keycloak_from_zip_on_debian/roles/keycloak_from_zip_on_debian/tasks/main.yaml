@@ -1,99 +1,116 @@
 ---
 - name: Ensure dependencies are installed
-  apt:
+  ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   loop:
     - unzip
     - openjdk-17-jdk
     - postgresql
-    - python3-psycopg2  # Add psycopg2 library
+    - python3-psycopg2
   register: apt_result
   retries: 3
   delay: 5
   until: apt_result is succeeded
 
 - name: Ensure PostgreSQL service is started
-  service:
+  ansible.builtin.service:
     name: postgresql
     state: started
-    enabled: yes
+    enabled: true
+
 - name: Set PostgreSQL password for 'postgres' user
   ansible.builtin.shell: |
-    sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ postgres_password }}';"
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}';"
+  become: true
+  changed_when: false
 
+# - name: Create Keycloak database
+#   community.postgresql.postgresql_db:
+#     name: keycloak
+#     state: present
+#   become: true
+#   become_user: postgres
 - name: Create Keycloak database
   community.postgresql.postgresql_db:
     name: keycloak
     state: present
-  become: yes
-  become_user: postgres
+    login_user: postgres
+    login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    login_host: localhost
 
-- name: Ensure PostgreSQL is listening on all interfaces
-  ansible.builtin.lineinfile:
-    path: /etc/postgresql/15/main/postgresql.conf
-    regexp: "^#?listen_addresses ="
-    line: "listen_addresses = '*'"
-  become: yes
-  become_user: postgres
+# - name: Ensure PostgreSQL is listening on all interfaces
+#   ansible.builtin.lineinfile:
+#     path: /etc/postgresql/15/main/postgresql.conf
+#     regexp: "^#?listen_addresses ="
+#     line: "listen_addresses = '*'"
+#   become: true
+#   become_user: postgres
 
-- name: Set ACL for postgresql.conf
-  ansible.builtin.command: setfacl -m u:postgres:r-x /etc/postgresql/15/main/postgresql.conf
-  become: yes
+# - name: Set ACL for postgresql.conf
+#   ansible.builtin.command: setfacl -m u:postgres:r-x /etc/postgresql/15/main/postgresql.conf
+#   become: true
 
 - name: Create Keycloak database user
   community.postgresql.postgresql_user:
     name: keycloak
-    password: "{{ postgres_password }}"
+    password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
     priv: "ALL"
     db: keycloak
     role_attr_flags: LOGIN
-  become: yes
+  become: true
   become_user: postgres
 
 - name: Allow local connections to PostgreSQL
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/postgresql/15/main/pg_hba.conf
     regexp: '^host\s+all\s+all\s+127\.0\.0\.1/32\s+'
     line: 'host    all             all             127.0.0.1/32            md5'
 
 - name: Restart PostgreSQL to apply changes
-  service:
+  ansible.builtin.service:
     name: postgresql
     state: restarted
 
 - name: Download Keycloak ZIP archive
-  get_url:
-    url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.zip"
-    dest: "/tmp/keycloak-{{ keycloak_version }}.zip"
+  ansible.builtin.get_url:
+    url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_from_zip_on_debian_keycloak_version }}/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    dest: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    mode: '0644'
+  become: true
 
 - name: Create Keycloak installation directory
-  file:
-    path: "{{ keycloak_install_dir }}"
+  ansible.builtin.file:
+    path: "{{ keycloak_from_zip_on_debian_keycloak_install_dir }}"
     state: directory
+    mode: '0755'
+  become: true
 
 - name: Extract Keycloak ZIP archive
-  unarchive:
-    src: "/tmp/keycloak-{{ keycloak_version }}.zip"
-    dest: "{{ keycloak_install_dir }}"
-    remote_src: yes
+  ansible.builtin.unarchive:
+    src: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
+    dest: "{{ keycloak_from_zip_on_debian_keycloak_install_dir }}"
+    remote_src: true
 
 - name: Start Keycloak
-  shell: |
-    nohup {{ keycloak_install_dir }}/keycloak-{{ keycloak_version }}/bin/kc.sh start-dev --hostname={{ keycloak_hostname }} > /opt/keycloak/keycloak.log 2>&1 &
+  ansible.builtin.shell: |
+    nohup {{ keycloak_from_zip_on_debian_keycloak_install_dir }}/keycloak-
+    {{ keycloak_from_zip_on_debian_keycloak_version }}/bin/kc.sh start-dev
+    --hostname={{ keycloak_from_zip_on_debian_keycloak_keycloak_hostname }}
+    > /opt/keycloak/keycloak.log 2>&1 &
   async: 30
   poll: 0
   changed_when: false
   register: keycloak_start
 
 - name: Wait for Keycloak to start
-  wait_for:
+  ansible.builtin.wait_for:
     port: 8080
     delay: 10
     timeout: 300
     state: started
 
 - name: Cleanup downloaded files
-  file:
-    path: "/tmp/keycloak-{{ keycloak_version }}.zip"
+  ansible.builtin.file:
+    path: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
     state: absent
