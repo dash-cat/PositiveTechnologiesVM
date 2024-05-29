@@ -1,8 +1,12 @@
 ---
 - name: Install Keycloak from ZIP on Debian
-  hosts: localhost
-  become: true
-  gather_facts: true
+  hosts: all
+  become: yes
+  vars:
+    keycloak_version: "20.0.1"
+    keycloak_install_dir: "/opt/keycloak"
+    keycloak_hostname: "localhost"
+    postgres_password: "your_postgres_password"  # Define your PostgreSQL password here
 
   tasks:
     - name: Ensure dependencies are installed
@@ -13,29 +17,46 @@
         - unzip
         - openjdk-17-jdk
         - postgresql
-        - postgresql-contrib
-        - coreutils  # Ensure basic commands like mkdir and sleep are available
+        - python3-psycopg2  # Add psycopg2 library
+      register: apt_result
       retries: 3
       delay: 5
+      until: apt_result is succeeded
+
+    - name: Ensure PostgreSQL service is started
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
 
     - name: Set PostgreSQL password for 'postgres' user
-      ansible.builtin.command:
-        cmd: "sudo -u postgres psql -c \"ALTER USER postgres PASSWORD '{{ postgres_password }}';\""
-        warn: false
+      ansible.builtin.shell: |
+        sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ postgres_password }}';"
 
-    - name: Create PostgreSQL database
-      become: true
-      postgresql_db:
+    - name: Create Keycloak database
+      become_user: postgres
+      community.postgresql.postgresql_db:
         name: keycloak
-        state: present
 
-    - name: Create PostgreSQL user
-      become: true
-      postgresql_user:
+    - name: Create Keycloak database user
+      become_user: postgres
+      community.postgresql.postgresql_user:
         name: keycloak
         password: "{{ postgres_password }}"
-        priv: "keycloak:ALL"
-        state: present
+        priv: "ALL"
+        db: keycloak
+        role_attr_flags: LOGIN
+
+    - name: Allow local connections to PostgreSQL
+      lineinfile:
+        path: /etc/postgresql/15/main/pg_hba.conf
+        regexp: '^host\s+all\s+all\s+127\.0\.0\.1/32\s+'
+        line: 'host    all             all             127.0.0.1/32            md5'
+
+    - name: Restart PostgreSQL to apply changes
+      service:
+        name: postgresql
+        state: restarted
 
     - name: Download Keycloak ZIP archive
       get_url:
@@ -54,7 +75,21 @@
         remote_src: yes
 
     - name: Start Keycloak
-      shell: >
-        nohup {{ keycloak_install_dir }}/keycloak-{{ keycloak_version }}/bin/kc.sh start-dev --hostname={{ keycloak_hostname }} -Dquarkus.datasource.jdbc.url=jdbc:postgresql://localhost/keycloak -Dquarkus.datasource.username=keycloak -Dquarkus.datasource.password={{ postgres_password }} > /opt/keycloak/keycloak.log 2>&1 &
+      shell: |
+        nohup {{ keycloak_install_dir }}/keycloak-{{ keycloak_version }}/bin/kc.sh start-dev --hostname={{ keycloak_hostname }} > /opt/keycloak/keycloak.log 2>&1 &
       async: 30
-     
+      poll: 0
+      changed_when: false
+      register: keycloak_start
+
+    - name: Wait for Keycloak to start
+      wait_for:
+        port: 8080
+        delay: 10
+        timeout: 300
+        state: started
+
+    - name: Cleanup downloaded files
+      file:
+        path: "/tmp/keycloak-{{ keycloak_version }}.zip"
+        state: absent
