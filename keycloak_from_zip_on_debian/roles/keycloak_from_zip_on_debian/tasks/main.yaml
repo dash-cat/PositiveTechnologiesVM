@@ -1,0 +1,42 @@
+- name: Ensure dependencies are installed
+  ansible.builtin.apt:
+    name: 
+      - unzip
+      - openjdk-17-jdk
+    state: present
+
+- name: Create Keycloak installation directory
+  ansible.builtin.file:
+    path: "{{ keycloak_from_zip_on_debian_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Download Keycloak ZIP archive
+  ansible.builtin.get_url:
+    url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_from_zip_on_debian_version }}/keycloak-{{ keycloak_from_zip_on_debian_version }}.zip"
+    dest: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_version }}.zip"
+    mode: '0644'
+
+- name: Extract Keycloak ZIP archive
+  ansible.builtin.unarchive:
+    src: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_version }}.zip"
+    dest: "{{ keycloak_from_zip_on_debian_install_dir }}"
+    remote_src: yes
+
+- name: Set environment variables for Keycloak
+  ansible.builtin.lineinfile:
+    path: /etc/profile.d/keycloak.sh
+    line: 'export PATH={{ keycloak_from_zip_on_debian_install_dir }}/bin:$PATH'
+    create: yes
+    mode: '0644'
+
+- name: Start Keycloak
+  ansible.builtin.include_role:
+    name: keycloak_from_zip_on_debian
+    tasks_from: start_keycloak
+
+- name: Cleanup downloaded files
+  ansible.builtin.file:
+    path: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_version }}.zip"
+    state: absent
+    mode: '0644'

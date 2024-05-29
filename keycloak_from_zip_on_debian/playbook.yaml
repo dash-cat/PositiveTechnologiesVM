@@ -1,0 +1,13 @@
+- name: Install Keycloak from ZIP on Debian
+  hosts: all
+  become: true
+  vars:
+    keycloak_version: "20.0.1"
+    keycloak_install_dir: "/opt/keycloak"
+  roles:
+    - role: keycloak_from_zip_on_debian
+      vars:
+        keycloak_from_zip_on_debian_version: "{{ keycloak_version }}"
+        keycloak_from_zip_on_debian_install_dir: "{{ keycloak_install_dir }}"
+      tags:
+        - install
