@@ -3,10 +3,10 @@
   hosts: all
   become: true
   vars:
-    keycloak_version: "20.0.1"
+    keycloak_from_zip_on_debian_keycloak_version: "20.0.1"
   roles:
     - role: keycloak_from_zip_on_debian
       vars:
-        keycloak_from_zip_on_debian_version: "{{ keycloak_version }}"
+        keycloak_from_zip_on_debian_version: "{{ keycloak_from_zip_on_debian_keycloak_version }}"
       tags:
         - install
