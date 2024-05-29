@@ -1,0 +1,11 @@
+{
+    "name": "keycloak",
+    "detect": {
+        "type": "shell",
+        "command": "cat /opt/keycloak/keycloak-*/version.txt | grep -oP 'Version \\K[0-9.]+'"
+    },
+    "cpe": {
+        "app": "keycloak",
+        "manufacturer": "redhat"
+    }
+}
