@@ -1,3 +1,0 @@
-- name: Start Keycloak
-  ansible.builtin.command: "{{ keycloak_from_zip_on_debian_install_dir }}/keycloak-{{ keycloak_from_zip_on_debian_version }}/bin/kc.sh start-dev --hostname={{ keycloak_from_zip_on_debian_hostname }}"
-  changed_when: false

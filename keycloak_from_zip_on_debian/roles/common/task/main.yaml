@@ -1,0 +1,14 @@
+---
+- name: Ensure dependencies are installed
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - unzip
+    - openjdk-17-jdk
+    - postgresql
+    - python3-psycopg2  # Add psycopg2 library
+  register: apt_result
+  retries: 3
+  delay: 5
+  until: apt_result is succeeded

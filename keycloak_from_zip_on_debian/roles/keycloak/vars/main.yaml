@@ -1,0 +1,4 @@
+---
+keycloak_version: "20.0.1"
+keycloak_install_dir: "/opt/keycloak"
+keycloak_hostname: "localhost"
