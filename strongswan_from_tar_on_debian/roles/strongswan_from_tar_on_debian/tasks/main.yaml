@@ -14,8 +14,8 @@
 
 - name: Download strongSwan TAR archive
   ansible.builtin.get_url:
-    url: "https://download.strongswan.org/strongswan-{{ strongswan_version }}.tar.gz"
-    dest: "/tmp/strongswan-{{ strongswan_version }}.tar.gz"
+    url: "https://download.strongswan.org/strongswan-{{ strongswan_from_tar_on_debian_strongswan_version }}.tar.gz"
+    dest: "/tmp/strongswan-{{ strongswan_from_tar_on_debian_strongswan_version }}.tar.gz"
 
 - name: Create strongSwan installation directory
   ansible.builtin.file:
@@ -24,13 +24,13 @@
 
 - name: Extract strongSwan TAR archive
   ansible.builtin.unarchive:
-    src: "/tmp/strongswan-{{ strongswan_version }}.tar.gz"
+    src: "/tmp/strongswan-{{ strongswan_from_tar_on_debian_strongswan_version }}.tar.gz"
     dest: "{{ strongswan_install_dir }}"
     remote_src: yes
 
 - name: Compile and install strongSwan
   ansible.builtin.shell: |
-    cd {{ strongswan_install_dir }}/strongswan-{{ strongswan_version }}
+    cd {{ strongswan_install_dir }}/strongswan-{{ strongswan_from_tar_on_debian_strongswan_version }}
     ./configure
     make
     sudo make install
@@ -67,5 +67,5 @@
 
 - name: Cleanup downloaded files
   ansible.builtin.file:
-    path: "/tmp/strongswan-{{ strongswan_version }}.tar.gz"
+    path: "/tmp/strongswan-{{ strongswan_from_tar_on_debian_strongswan_version }}.tar.gz"
     state: absent

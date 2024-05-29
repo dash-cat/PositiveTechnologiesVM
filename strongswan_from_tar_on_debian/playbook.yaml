@@ -2,11 +2,7 @@
 - name: Install strongSwan from TAR on Debian 12
   hosts: all
   become: true
-  vars:
-    strongswan_version: "5.9.8"
   roles:
     - role: strongswan_from_tar_on_debian
-      vars:
-        strongswan_from_tar_on_debian_version: "{{ strongswan_version }}"
       tags:
         - install
