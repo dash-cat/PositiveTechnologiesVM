@@ -1,2 +1,3 @@
 keycloak_from_zip_on_debian_version: "20.0.1"
 keycloak_from_zip_on_debian_install_dir: "/opt/keycloak"
+keycloak_from_zip_on_debian_hostname: "localhost"
