@@ -25,12 +25,6 @@
   become: true
   changed_when: false
 
-# - name: Create Keycloak database
-#   community.postgresql.postgresql_db:
-#     name: keycloak
-#     state: present
-#   become: true
-#   become_user: postgres
 - name: Create Keycloak database
   community.postgresql.postgresql_db:
     name: keycloak
@@ -38,18 +32,6 @@
     login_user: postgres
     login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
     login_host: localhost
-
-# - name: Ensure PostgreSQL is listening on all interfaces
-#   ansible.builtin.lineinfile:
-#     path: /etc/postgresql/15/main/postgresql.conf
-#     regexp: "^#?listen_addresses ="
-#     line: "listen_addresses = '*'"
-#   become: true
-#   become_user: postgres
-
-# - name: Set ACL for postgresql.conf
-#   ansible.builtin.command: setfacl -m u:postgres:r-x /etc/postgresql/15/main/postgresql.conf
-#   become: true
 
 - name: Create Keycloak database user
   community.postgresql.postgresql_user:
@@ -92,24 +74,6 @@
     src: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
     dest: "{{ keycloak_from_zip_on_debian_keycloak_install_dir }}"
     remote_src: true
-
-- name: Start Keycloak
-  ansible.builtin.shell: |
-    nohup {{ keycloak_from_zip_on_debian_keycloak_install_dir }}/keycloak-
-    {{ keycloak_from_zip_on_debian_keycloak_version }}/bin/kc.sh start-dev
-    --hostname={{ keycloak_from_zip_on_debian_keycloak_keycloak_hostname }}
-    > /opt/keycloak/keycloak.log 2>&1 &
-  async: 30
-  poll: 0
-  changed_when: false
-  register: keycloak_start
-
-- name: Wait for Keycloak to start
-  ansible.builtin.wait_for:
-    port: 8080
-    delay: 10
-    timeout: 300
-    state: started
 
 - name: Cleanup downloaded files
   ansible.builtin.file:
