@@ -1,15 +1,60 @@
+---
 - name: Install Keycloak from ZIP on Debian
-  hosts: all
+  hosts: localhost
   become: true
-  vars:
-    keycloak_version: "20.0.1"
-    keycloak_install_dir: "/opt/keycloak"
-    keycloak_hostname: "localhost"
-  roles:
-    - role: keycloak_from_zip_on_debian
-      vars:
-        keycloak_from_zip_on_debian_version: "{{ keycloak_version }}"
-        keycloak_from_zip_on_debian_install_dir: "{{ keycloak_install_dir }}"
-        keycloak_from_zip_on_debian_hostname: "{{ keycloak_hostname }}"
-      tags:
-        - install
+  gather_facts: true
+
+  tasks:
+    - name: Ensure dependencies are installed
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - unzip
+        - openjdk-17-jdk
+        - postgresql
+        - postgresql-contrib
+        - coreutils  # Ensure basic commands like mkdir and sleep are available
+      retries: 3
+      delay: 5
+
+    - name: Set PostgreSQL password for 'postgres' user
+      ansible.builtin.command:
+        cmd: "sudo -u postgres psql -c \"ALTER USER postgres PASSWORD '{{ postgres_password }}';\""
+        warn: false
+
+    - name: Create PostgreSQL database
+      become: true
+      postgresql_db:
+        name: keycloak
+        state: present
+
+    - name: Create PostgreSQL user
+      become: true
+      postgresql_user:
+        name: keycloak
+        password: "{{ postgres_password }}"
+        priv: "keycloak:ALL"
+        state: present
+
+    - name: Download Keycloak ZIP archive
+      get_url:
+        url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.zip"
+        dest: "/tmp/keycloak-{{ keycloak_version }}.zip"
+
+    - name: Create Keycloak installation directory
+      file:
+        path: "{{ keycloak_install_dir }}"
+        state: directory
+
+    - name: Extract Keycloak ZIP archive
+      unarchive:
+        src: "/tmp/keycloak-{{ keycloak_version }}.zip"
+        dest: "{{ keycloak_install_dir }}"
+        remote_src: yes
+
+    - name: Start Keycloak
+      shell: >
+        nohup {{ keycloak_install_dir }}/keycloak-{{ keycloak_version }}/bin/kc.sh start-dev --hostname={{ keycloak_hostname }} -Dquarkus.datasource.jdbc.url=jdbc:postgresql://localhost/keycloak -Dquarkus.datasource.username=keycloak -Dquarkus.datasource.password={{ postgres_password }} > /opt/keycloak/keycloak.log 2>&1 &
+      async: 30
+     
