@@ -25,12 +25,19 @@
   become: true
   changed_when: false
 
+# - name: Create Keycloak database
+#   community.postgresql.postgresql_db:
+#     name: keycloak
+#     state: present
+#   become: true
+#   become_user: postgres
 - name: Create Keycloak database
   community.postgresql.postgresql_db:
     name: keycloak
     state: present
-  become: true
-  become_user: postgres
+    login_user: postgres
+    login_password: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    login_host: localhost
 
 # - name: Ensure PostgreSQL is listening on all interfaces
 #   ansible.builtin.lineinfile:
