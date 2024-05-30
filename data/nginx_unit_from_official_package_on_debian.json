@@ -1,0 +1,11 @@
+{
+    "name": "nginx_unit",
+    "detect": {
+        "type": "shell",
+        "command": "/usr/local/sbin/swanctl | grep -oP 'strongSwan \\K[\\d.]+'"
+    },
+    "cpe": {
+        "app": "unit",
+        "manufacturer": "nginx"
+    }
+}
