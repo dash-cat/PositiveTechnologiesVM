@@ -1,0 +1,35 @@
+- name: Ensure dependencies are installed
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - build-essential
+    - libssl-dev
+    - zlib1g-dev
+    - wget
+
+- name: Download OpenLiteSpeed tar.gz
+  get_url:
+    url: "https://openlitespeed.org/packages/openlitespeed-{{ openlitespeed_version }}.tgz"
+    dest: "/tmp/openlitespeed-{{ openlitespeed_version }}.tgz"
+
+- name: Extract OpenLiteSpeed tar.gz
+  unarchive:
+    src: "/tmp/openlitespeed-{{ openlitespeed_version }}.tgz"
+    dest: "/usr/local"
+    remote_src: yes
+
+- name: Compile and install OpenLiteSpeed
+  shell: |
+    cd /usr/local/openlitespeed-{{ openlitespeed_version }}
+    ./configure
+    make
+    make install
+  args:
+    creates: /usr/local/lsws/bin/lswsctrl
+
+- name: Start OpenLiteSpeed
+  service:
+    name: lsws
+    state: started
+    enabled: yes

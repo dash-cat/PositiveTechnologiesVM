@@ -1,0 +1,10 @@
+- name: Install OpenLiteSpeed from tar on Debian
+  hosts: all
+  become: true
+  vars:
+    openlitespeed_version: "1.7.16"
+  roles:
+    - role: openlitespeed_from_tar_on_debian
+      openlitespeed_version: "{{ openlitespeed_version }}"
+      tags:
+        - install

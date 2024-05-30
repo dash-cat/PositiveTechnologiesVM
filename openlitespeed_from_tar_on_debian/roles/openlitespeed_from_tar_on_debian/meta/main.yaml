@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  author: your_name
+  description: Ansible role to install OpenLiteSpeed from tar on Debian 12
+  company: your_company
+  license: MIT
+  min_ansible_version: 2.9
+
+dependencies: []
