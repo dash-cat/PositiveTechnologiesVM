@@ -1,0 +1,12 @@
+---
+- name: Install CouchDB from official packages on Debian 12
+  hosts: all
+  become: true
+  vars:
+    couchdb_version: "3.2.0"
+  roles:
+    - role: couchdb_from_official_on_debian
+      vars:
+        couchdb_version: "{{ couchdb_version }}"
+      tags:
+        - install

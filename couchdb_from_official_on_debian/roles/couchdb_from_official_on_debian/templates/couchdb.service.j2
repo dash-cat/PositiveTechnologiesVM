@@ -1,0 +1,11 @@
+[Unit]
+Description=CouchDB service
+After=network.target
+
+[Service]
+Type=simple
+User=couchdb
+ExecStart=/opt/couchdb/bin/couchdb -o /dev/null -e /dev/null
+
+[Install]
+WantedBy=multi-user.target

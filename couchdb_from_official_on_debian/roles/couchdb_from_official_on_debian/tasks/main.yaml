@@ -1,0 +1,38 @@
+---
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - curl
+      - apt-transport-https
+      - gnupg
+      - build-essential
+      - pkg-config
+      - erlang
+      - libicu-dev
+      - libmozjs-78-dev
+    state: present
+
+- name: Add CouchDB repository key
+  ansible.builtin.command:
+    cmd: "curl https://couchdb.apache.org/repo/keys.asc | gpg --dearmor -o /usr/share/keyrings/couchdb-archive-keyring.gpg"
+    creates: /usr/share/keyrings/couchdb-archive-keyring.gpg
+
+- name: Add CouchDB repository
+  ansible.builtin.command:
+    cmd: "echo 'deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg] https://apache.jfrog.io/artifactory/couchdb-deb/ $(lsb_release -cs) main' | tee /etc/apt/sources.list.d/couchdb.list"
+    creates: /etc/apt/sources.list.d/couchdb.list
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install CouchDB
+  ansible.builtin.apt:
+    name: couchdb
+    state: present
+
+- name: Start and enable CouchDB service
+  ansible.builtin.systemd:
+    name: couchdb
+    state: started
+    enabled: yes
