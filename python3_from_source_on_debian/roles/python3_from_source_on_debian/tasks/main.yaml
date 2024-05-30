@@ -34,9 +34,10 @@
     cd /usr/src/cpython-{{ python_version }}
     ./configure --enable-optimizations
     make -j$(nproc)
-    make altinstall
+    sudo make install
   args:
-    creates: /usr/local/bin/python{{ python_version[:3] }}
+    creates: /usr/local/bin/python3
+  become: true
 
 - name: Verify Python installation
-  command: /usr/local/bin/python{{ python_version[:3] }} --version
+  command: /usr/local/bin/python3 --version
