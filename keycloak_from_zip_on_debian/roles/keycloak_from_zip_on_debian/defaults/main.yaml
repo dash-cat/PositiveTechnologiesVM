@@ -2,4 +2,4 @@
 keycloak_from_zip_on_debian_keycloak_version: "20.0.1"
 keycloak_from_zip_on_debian_keycloak_install_dir: "/opt/keycloak"
 keycloak_from_zip_on_debian_keycloak_keycloak_hostname: "localhost"
-keycloak_from_zip_on_debian_keycloak_postgres_password: "your_postgres_password"  # Define the default value for postgres_password here
+keycloak_from_zip_on_debian_keycloak_postgres_password: "your_postgres_password"

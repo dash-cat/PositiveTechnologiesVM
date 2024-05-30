@@ -86,3 +86,29 @@
   ansible.builtin.file:
     path: "/tmp/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}.zip"
     state: absent
+
+- name: Set Keycloak environment variables
+  ansible.builtin.shell: |
+    echo 'export DB_VENDOR=POSTGRES' >> /etc/environment
+    echo 'export DB_ADDR=localhost' >> /etc/environment
+    echo 'export DB_DATABASE=keycloak' >> /etc/environment
+    echo 'export DB_USER=keycloak' >> /etc/environment
+    echo 'export DB_PASSWORD={{ keycloak_from_zip_on_debian_keycloak_postgres_password }}' >> /etc/environment
+    echo 'export KEYCLOAK_USER=admin' >> /etc/environment
+    echo 'export KEYCLOAK_PASSWORD={{ keycloak_from_zip_on_debian_keycloak_postgres_password }}' >> /etc/environment
+  become: true
+  changed_when: false
+
+- name: Start Keycloak server
+  ansible.builtin.shell: |
+    nohup {{ keycloak_from_zip_on_debian_keycloak_install_dir }}/keycloak-{{ keycloak_from_zip_on_debian_keycloak_version }}/bin/kc.sh start-dev &
+  become: true
+  environment:
+    DB_VENDOR: POSTGRES
+    DB_ADDR: localhost
+    DB_DATABASE: keycloak
+    DB_USER: keycloak
+    DB_PASSWORD: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+    KEYCLOAK_USER: admin
+    KEYCLOAK_PASSWORD: "{{ keycloak_from_zip_on_debian_keycloak_postgres_password }}"
+  changed_when: false
