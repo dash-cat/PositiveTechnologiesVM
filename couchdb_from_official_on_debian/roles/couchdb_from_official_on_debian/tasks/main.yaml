@@ -13,14 +13,27 @@
     state: present
 
 - name: Add CouchDB repository key
-  ansible.builtin.command:
+  ansible.builtin.shell:
     cmd: "curl https://couchdb.apache.org/repo/keys.asc | gpg --dearmor -o /usr/share/keyrings/couchdb-archive-keyring.gpg"
     creates: /usr/share/keyrings/couchdb-archive-keyring.gpg
 
 - name: Add CouchDB repository
-  ansible.builtin.command:
-    cmd: "echo 'deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg] https://apache.jfrog.io/artifactory/couchdb-deb/ $(lsb_release -cs) main' | tee /etc/apt/sources.list.d/couchdb.list"
+  ansible.builtin.shell:
+    cmd: "echo \"deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg allow-insecure=yes] https://apache.jfrog.io/artifactory/couchdb-deb/ $(lsb_release -cs) main\" | tee /etc/apt/sources.list.d/couchdb.list"
     creates: /etc/apt/sources.list.d/couchdb.list
+
+- name: Allow insecure repositories
+  ansible.builtin.file:
+    path: /etc/apt/apt.conf.d/99allow-insecure
+    state: touch
+
+- name: Configure APT to allow insecure repositories
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/99allow-insecure
+    line: 'Acquire::AllowInsecureRepositories "true";'
+
+- name: Disable SSL verification
+  ansible.builtin.shell: "echo 'Acquire::https::Verify-Peer false;' | tee -a /etc/apt/apt.conf.d/99disable-ssl-verification"
 
 - name: Update apt cache
   ansible.builtin.apt:
