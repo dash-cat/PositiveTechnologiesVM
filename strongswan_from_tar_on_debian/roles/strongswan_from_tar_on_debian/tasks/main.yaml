@@ -50,7 +50,7 @@
       After=network.target
 
       [Service]
-      ExecStart=/usr/local/sbin/swanctl --no-daemon
+      ExecStart=/usr/local/sbin/swanctl
       ExecReload=/bin/kill -HUP $MAINPID
       KillMode=process
       Restart=on-failure
