@@ -1,0 +1,69 @@
+# tasks/main.yaml
+---
+- name: Ensure dependencies are installed
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - lsb-release
+  register: apt_result
+  retries: 3
+  delay: 5
+  until: apt_result is succeeded
+
+- name: Download NGINX Unit GPG key
+  ansible.builtin.get_url:
+    url: "https://unit.nginx.org/keys/nginx-keyring.gpg"
+    dest: "/usr/share/keyrings/nginx-keyring.gpg"
+    mode: '0644'
+  become: true
+
+- name: Add NGINX Unit repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/unit.list
+    content: |
+      deb [signed-by=/usr/share/keyrings/nginx-keyring.gpg] https://packages.nginx.org/unit/debian/ bookworm unit
+      deb-src [signed-by=/usr/share/keyrings/nginx-keyring.gpg] https://packages.nginx.org/unit/debian/ bookworm unit
+  become: true
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+  become: true
+
+- name: Install NGINX Unit
+  ansible.builtin.apt:
+    name: "unit"
+    state: present
+  become: true
+
+- name: Install NGINX Unit language modules
+  ansible.builtin.apt:
+    name:
+      - unit-dev
+      - unit-jsc17
+      - unit-perl
+      - unit-php
+      - unit-python3.11
+      - unit-ruby
+      - unit-wasm
+    state: present
+  become: true
+
+- name: Restart NGINX Unit
+  ansible.builtin.systemd:
+    name: unit
+    state: restarted
+
+- name: Verify NGINX Unit installation
+  ansible.builtin.shell: |
+    curl -X GET --unix-socket /run/control.unit.sock http://localhost/
+  register: result
+  changed_when: false
+
+- name: Display verification result
+  ansible.builtin.debug:
+    var: result.stdout

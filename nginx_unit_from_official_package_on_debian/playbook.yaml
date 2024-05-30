@@ -1,0 +1,10 @@
+---
+- name: Install NGINX Unit from official package on Debian
+  hosts: all
+  become: true
+  vars:
+    nginx_unit_version: "1.27.0"
+  roles:
+    - role: nginx_unit_from_official_package_on_debian
+      vars:
+        nginx_unit_version: "{{ nginx_unit_version }}"
