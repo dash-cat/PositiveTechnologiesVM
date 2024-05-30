@@ -1,0 +1,2 @@
+bareos_from_tar_on_debian_version: "21.0.0"
+bareos_from_tar_on_debian_install_dir: "/opt/bareos"

@@ -1,0 +1,9 @@
+- name: Install Bareos Community Edition from TAR on Debian 12
+  hosts: all
+  become: true
+  vars:
+    bareos_version: "21.0.0"  # Replace with the desired version
+  roles:
+    - role: bareos_from_tar_on_debian
+      vars:
+        bareos_from_tar_on_debian_version: "{{ bareos_version }}"
