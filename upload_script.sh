@@ -4,19 +4,31 @@ SSH_HOST="localhost"
 SSH_PORT=2222
 SSH_USER="ansible"
 
+# Array of specific files to copy
 FILES_TO_COPY=(
   "software_detection/detect.py"
   "software_detection/oval_vars.xml.j2"
   "software_detection/requirements.txt"
-  "data/keycloak_from_zip_on_debian.json"
-  "data/strongswan_from_tar_on_debian.json"
-  "data/nginx_unit_from_official_package_on_debian.json"
 )
+
+# Add each JSON file in the data folder to the array
+for file in data/*.json; do
+  FILES_TO_COPY+=("$file")
+done
+
+echo "Will copy $FILES_TO_COPY"
+
 REMOTE_PATH="/home/ansible/"
 
+# Function to echo and execute a command
 echoed() {
   echo "# $@"
   "$@"
 }
 
-echoed scp -P $SSH_PORT ${FILES_TO_COPY[@]} $SSH_USER@$SSH_HOST:$REMOTE_PAT
+# Copy all files in a single scp command
+echoed scp -P $SSH_PORT ${FILES_TO_COPY[@]} $SSH_USER@$SSH_HOST:$REMOTE_PATH
+
+
+
+
