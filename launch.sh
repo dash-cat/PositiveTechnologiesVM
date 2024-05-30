@@ -42,4 +42,5 @@ ansible_python_interpreter=/usr/bin/python3
 EOL
 
 # Запуск Ansible playbook
-ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ${PLAYBOOK_PATH} -vvv
+
+ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ${PLAYBOOK_PATH}

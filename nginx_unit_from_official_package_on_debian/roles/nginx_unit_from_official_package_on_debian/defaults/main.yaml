@@ -1,1 +1,1 @@
-nginx_unit_version: "1.32.1"
+nginx_unit_from_official_package_on_debian_version: "1.32.1"
