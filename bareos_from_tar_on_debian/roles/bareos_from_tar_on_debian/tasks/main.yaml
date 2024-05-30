@@ -3,11 +3,26 @@
     name: "{{ item }}"
     state: present
   loop:
+    - libxml2-dev
+    - libjson-c-dev
+    - libgtest-dev
     - build-essential
-    - libacl1-dev
-    - zlib1g-dev
+    - cmake
+    - git
+    - libjansson-dev
     - libssl-dev
-    - wget
+    - libsystemd-dev
+    - python3-dev
+    - pkg-config
+    - zlib1g-dev
+    - libreadline-dev
+    - libncurses5-dev
+    - libpam0g-dev
+    - liblzo2-dev
+    - libacl1-dev
+    - google-mock
+    libgtest-dev
+    googletest-tools
   register: apt_result
   retries: 3
   delay: 5
@@ -15,8 +30,8 @@
 
 - name: Download Bareos Community Edition TAR archive
   ansible.builtin.get_url:
-    url: "https://download.bareos.org/next/Debian_12/bareos_24.0.0~pre606.3f332687a.orig.tar.gz"
-    dest: "/tmp/bareos-24.0.0~pre606.3f332687a.orig.tar.gz"
+    url: "https://github.com/bareos/bareos/archive/refs/tags/Release/23.0.2.tar.gz"
+    dest: "/tmp/bareos-23.0.2.tar.gz"
     mode: '0644'
 
 - name: Create Bareos installation directory
@@ -27,25 +42,18 @@
 
 - name: Extract Bareos TAR archive
   ansible.builtin.unarchive:
-    src: "/tmp/bareos-24.0.0~pre606.3f332687a.orig.tar.gz"
+    src: "/tmp/bareos-23.0.2.tar.gz"
     dest: "/opt/bareos"
     remote_src: true
 
-- name: Find the extracted configure script
-  ansible.builtin.find:
-    paths: "/opt/bareos"
-    recurse: true
-    patterns: "configure"
-  register: found_dirs
-
-- name: Compile and install Bareos
+- name: Compile and install Bareos using CMake
   ansible.builtin.shell: |
-    cd {{ item.path | dirname }}
-    ./configure
-    make
+    sudo mkdir -p /opt/bareos/bareos-Release-23.0.2/build
+    cd /opt/bareos/bareos-Release-23.0.2/build
+    sudo cmake -DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql -DPostgreSQL_LIBRARIES=/usr/lib/x86_64-linux-gnu/libpq.so ..
+    sudo make
     sudo make install
-  loop: "{{ found_dirs.files }}"
-  when: found_dirs.matched > 0
+  become: true
 
 - name: Check contents of extracted Bareos directory
   ansible.builtin.command:
@@ -61,15 +69,15 @@
     state: directory
   become: true
 
-- name: Copy default configuration files
-  ansible.builtin.copy:
-    src: "/opt/bareos/bareos-24.0.0~pre606.3f332687a/config"
-    dest: "/etc/bareos/"
-    remote_src: true
-    mode: '0644'
-    directory_mode: '0755'
-  become: true
-  ignore_errors: true
+# - name: Copy default configuration files
+#   ansible.builtin.copy:
+#     src: "/opt/bareos/bareos-Release-23.0.2/config"
+#     dest: "/etc/bareos/"
+#     remote_src: true
+#     mode: '0644'
+#     directory_mode: '0755'
+#   become: true
+#   ignore_errors: true
 
 - name: Reload systemd daemon
   ansible.builtin.systemd:
@@ -87,5 +95,5 @@
 
 - name: Cleanup downloaded files
   ansible.builtin.file:
-    path: "/tmp/bareos-24.0.0~pre606.3f332687a.orig.tar.gz"
+    path: "/tmp/bareos-23.0.2.tar.gz"
     state: absent
