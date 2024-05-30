@@ -1,0 +1,9 @@
+- name: Install Python 3 from source on Debian
+  hosts: all
+  become: true
+  vars:
+    python_version: "3.12.3"
+  roles:
+    - role: python3_from_source_on_debian
+      tags:
+        - install
