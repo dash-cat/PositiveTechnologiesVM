@@ -1,0 +1,13 @@
+- name: Install ILIAS from zip on Debian
+  hosts: all
+  become: true
+  vars:
+    ilias_version: "latest"
+    ilias_zip_url: "https://docu.ilias.de/ilias.php?baseClass=illmpresentationgui&cmd=resume&ref_id=1719"
+  roles:
+    - role: ilias_from_zip_on_debian
+      vars:
+        ilias_from_zip_on_debian_version: "{{ ilias_version }}"
+        ilias_from_zip_on_debian_url: "{{ ilias_zip_url }}"
+      tags:
+        - install

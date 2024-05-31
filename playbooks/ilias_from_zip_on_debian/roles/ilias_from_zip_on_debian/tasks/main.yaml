@@ -1,0 +1,115 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - apache2
+      - php
+      - php-mysql
+      - php-xml
+      - php-zip
+      - php-curl
+      - php-mbstring
+      - libapache2-mod-php
+      - mariadb-server
+      - wget
+      - unzip
+      - build-essential
+      - libtool
+      - autoconf
+      - git
+    state: present
+
+- name: Download ILIAS source
+  get_url:
+    url: "{{ ilias_from_zip_on_debian_url }}"
+    dest: /tmp/ilias.zip
+
+- name: Unzip ILIAS source
+  unarchive:
+    src: /tmp/ilias.zip
+    dest: /tmp/
+    remote_src: yes
+
+- name: Move ILIAS to web directory
+  command: mv /tmp/ilias /var/www/html/ilias
+
+- name: Set permissions
+  file:
+    path: /var/www/html/ilias
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+    recurse: yes
+
+- name: Configure Apache for ILIAS
+  copy:
+    content: |
+      <VirtualHost *:80>
+          ServerAdmin webmaster@localhost
+          DocumentRoot /var/www/html/ilias
+          <Directory /var/www/html/ilias>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+          ErrorLog ${APACHE_LOG_DIR}/error.log
+          CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+    dest: /etc/apache2/sites-available/ilias.conf
+
+- name: Enable ILIAS site
+  command: a2ensite ilias.conf
+
+- name: Disable default site
+  command: a2dissite 000-default.conf
+
+- name: Enable Apache rewrite module
+  command: a2enmod rewrite
+
+- name: Restart Apache
+  service:
+    name: apache2
+    state: restarted
+
+- name: Secure MySQL installation - set root password
+  command: mysqladmin -u root password 'your_mysql_root_password'
+
+- name: Remove anonymous users
+  mysql_user:
+    name: ''
+    host_all: true
+    state: absent
+
+- name: Remove test database
+  mysql_db:
+    name: test
+    state: absent
+
+- name: Remove remote root login
+  mysql_user:
+    name: root
+    host: "{{ item }}"
+    state: absent
+  with_items:
+    - "%"
+    - "::1"
+
+- name: Reload privilege tables
+  command: mysqladmin flush-privileges
+
+- name: Create ILIAS database
+  mysql_db:
+    name: ilias_db
+    state: present
+
+- name: Create ILIAS database user
+  mysql_user:
+    name: ilias_user
+    password: "your_ilias_db_password"
+    priv: "ilias_db.*:ALL"
+    state: present
