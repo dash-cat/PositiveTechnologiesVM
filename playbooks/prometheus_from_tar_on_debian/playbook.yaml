@@ -1,0 +1,8 @@
+---
+- name: Install Prometheus from tar on Debian
+  hosts: all
+  become: true
+  roles:
+    - role: prometheus_from_tar_on_debian
+      tags:
+        - install

@@ -1,0 +1,56 @@
+---
+- name: Download Prometheus tarball
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus.tar.gz"
+    mode: '0644'
+
+- name: Extract Prometheus tarball
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus.tar.gz"
+    dest: "/opt/"
+    remote_src: true
+
+- name: Create Prometheus user
+  ansible.builtin.user:
+    name: prometheus
+    system: true
+    shell: /sbin/nologin
+
+- name: Set ownership of Prometheus files
+  ansible.builtin.file:
+    path: /opt/prometheus-{{ prometheus_version }}.linux-amd64
+    owner: prometheus
+    group: prometheus
+    recurse: true
+
+- name: Copy Prometheus service file
+  ansible.builtin.template:
+    src: "prometheus.service"
+    dest: "/etc/systemd/system/prometheus.service"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: true
+    state: started
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: Start Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+  become: true
+
+- name: Remove the downloaded tarball
+  ansible.builtin.file:
+    path: "/tmp/prometheus.tar.gz"
+    state: absent
