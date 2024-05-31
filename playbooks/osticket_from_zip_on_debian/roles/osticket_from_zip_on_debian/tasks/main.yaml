@@ -1,0 +1,74 @@
+---
+- name: Ensure dependencies are installed
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - apache2
+      - php
+      - php-mysqli
+      - libapache2-mod-php
+      - php-cli
+      - php-imap
+      - php-mbstring
+      - php-gd
+      - php-xml
+      - php-curl
+      - php-intl
+      - php-json
+      - php-zip
+    state: present
+    update_cache: true
+
+- name: Download osTicket
+  ansible.builtin.get_url:
+    url: "{{ osticket_from_zip_on_debian_url }}"
+    dest: "/tmp/osTicket-v{{ osticket_from_zip_on_debian_version }}.zip"
+    mode: '0644'
+
+- name: Create installation directory
+  ansible.builtin.file:
+    path: "{{ osticket_from_zip_on_debian_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Unzip osTicket
+  ansible.builtin.unarchive:
+    src: "/tmp/osTicket-v{{ osticket_from_zip_on_debian_version }}.zip"
+    dest: "{{ osticket_from_zip_on_debian_install_dir }}"
+    copy: false
+
+- name: Set correct permissions
+  ansible.builtin.file:
+    path: "{{ osticket_from_zip_on_debian_install_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: true
+
+- name: Configure Apache
+  ansible.builtin.copy:
+    content: |
+      <VirtualHost *:80>
+        DocumentRoot {{ osticket_from_zip_on_debian_install_dir }}/upload
+        <Directory {{ osticket_from_zip_on_debian_install_dir }}/upload>
+          AllowOverride All
+          Require all granted
+        </Directory>
+      </VirtualHost>
+    dest: /etc/apache2/sites-available/osticket.conf
+    mode: '0644'
+
+- name: Enable osTicket site
+  ansible.builtin.command:
+    cmd: a2ensite osticket.conf
+  changed_when: false
+
+- name: Enable Apache rewrite module
+  ansible.builtin.command:
+    cmd: a2enmod rewrite
+  changed_when: false
+
+- name: Restart Apache
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
