@@ -1,0 +1,8 @@
+---
+- name: Install strongSwan from TAR on Debian 12
+  hosts: all
+  become: true
+  roles:
+    - role: strongswan_from_tar_on_debian
+      tags:
+        - install

@@ -1,0 +1,11 @@
+{
+    "name": "python3",
+    "detect": {
+        "type": "shell",
+        "command": "/usr/local/bin/python3 --version | grep -oP 'Python \\K[\\d.]+'"
+    },
+    "cpe": {
+        "app": "python",
+        "manufacturer": "python"
+    }
+}
