@@ -62,7 +62,7 @@
       expect "Install zimbra-network-modules-ng" { send "Y\r" }
       expect "The system will be modified. Continue?" { send "Y\r" }
       expect eof
-  mode: '0755'
+    mode: '0755'
 
 - name: Run Zimbra installer with expect script
   command: /tmp/install_zimbra.expect
