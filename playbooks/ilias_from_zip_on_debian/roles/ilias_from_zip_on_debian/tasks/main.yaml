@@ -123,7 +123,7 @@
 
 - name: Set MySQL root password in a single script
   shell: |
-    mysqld_safe --skip-grant-tables --skip-networking &
+    nohup sudo mysqld_safe --skip-grant-tables --skip-networking > mysqld_safe.log 2>&1 &
     pid=$!
     sleep 5
     mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY 'your_mysql_root_password';"
