@@ -23,10 +23,12 @@
       - git
     state: present
 
-- name: Download ILIAS source
-  get_url:
-    url: "{{ ilias_from_zip_on_debian_url }}"
-    dest: /tmp/ilias.zip
+# - name: Download ILIAS source
+#   shell: wget -O /tmp/ilias.zip https://github.com/ILIAS-eLearning/ILIAS/releases/download/v9.1/ILIAS-9.1.zip
+
+- name: Check if the downloaded file is a valid ZIP
+  command: file /tmp/ilias.zip
+  register: file_type
 
 - name: Unzip ILIAS source
   unarchive:
@@ -34,8 +36,37 @@
     dest: /tmp/
     remote_src: yes
 
+- name: List contents of /tmp directory
+  command: ls -l /tmp
+  register: ls_output
+
+- name: Debug output of ls command
+  debug:
+    var: ls_output.stdout
+
+- name: Ensure the web directory is empty
+  file:
+    path: /var/www/html/ilias
+    state: absent
+
+- name: Create the web directory
+  file:
+    path: /var/www/html/ilias
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
 - name: Move ILIAS to web directory
-  command: mv /tmp/ilias /var/www/html/ilias
+  shell: mv /tmp/ILIAS-9.1/* /var/www/html/ilias/
+  ignore_errors: yes
+
+# - name: Move ILIAS to web directory - alternate
+#   shell: rsync -av /tmp/ILIAS-9.1/ /var/www/html/ilias/
+#   when: result is failed
+
+# - name: Move ILIAS to web directory
+#   command: mv /tmp/ILIAS-9.1/* /var/www/html/ilias/
 
 - name: Set permissions
   file:
@@ -76,36 +107,72 @@
     name: apache2
     state: restarted
 
-- name: Secure MySQL installation - set root password
-  command: mysqladmin -u root password 'your_mysql_root_password'
+- name: Install debconf-utils
+  apt:
+    name: debconf-utils
+    state: present
+
+- name: Start MariaDB service
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Secure MySQL installation and set root password
+  expect:
+    command: mysql_secure_installation
+    responses:
+      "Enter current password for root (enter for none):": ""
+      "Set root password?": "Y"
+      "New password:": "your_mysql_root_password"
+      "Re-enter new password:": "your_mysql_root_password"
+      "Remove anonymous users?": "Y"
+      "Disallow root login remotely?": "Y"
+      "Remove test database and access to it?": "Y"
+      "Reload privilege tables now?": "Y"
 
 - name: Remove anonymous users
   mysql_user:
     name: ''
     host_all: true
     state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
 
 - name: Remove test database
   mysql_db:
     name: test
     state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
 
 - name: Remove remote root login
   mysql_user:
     name: root
     host: "{{ item }}"
     state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
   with_items:
     - "%"
     - "::1"
 
 - name: Reload privilege tables
-  command: mysqladmin flush-privileges
+  mysql_user:
+    name: root
+    host: localhost
+    password: "your_mysql_root_password"
+    priv: "RELOAD"
+    state: present
+    login_user: root
+    login_password: "your_mysql_root_password"
 
 - name: Create ILIAS database
   mysql_db:
     name: ilias_db
     state: present
+    login_user: root
+    login_password: "your_mysql_root_password"
 
 - name: Create ILIAS database user
   mysql_user:
@@ -113,3 +180,5 @@
     password: "your_ilias_db_password"
     priv: "ilias_db.*:ALL"
     state: present
+    login_user: root
+    login_password: "your_mysql_root_password"

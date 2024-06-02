@@ -1,0 +1,120 @@
+# ofbiz_from_zip_on_debian12/roles/ofbiz_from_zip_on_debian12/tasks/main.yaml
+---
+- name: Ensure required packages are installed
+  apt:
+    name:
+      - unzip
+      - openjdk-17-jdk
+      - wget
+    state: present
+
+- name: Check Java version
+  command: java -version
+  register: java_version
+
+- debug:
+    var: java_version
+
+- name: Download OFBiz ZIP
+  get_url:
+    url: "https://archive.apache.org/dist/ofbiz/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+    dest: "/tmp/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+
+- name: Unzip OFBiz
+  unarchive:
+    src: "/tmp/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+    dest: /opt/
+    remote_src: yes
+
+- name: Ensure Gradle is installed
+  get_url:
+    url: "https://services.gradle.org/distributions/gradle-7.5-bin.zip"
+    dest: "/tmp/gradle-7.5-bin.zip"
+
+- name: Create Gradle installation directory
+  file:
+    path: /opt/gradle/
+    state: directory
+
+- name: Unzip Gradle
+  unarchive:
+    src: /tmp/gradle-7.5-bin.zip
+    dest: /opt/gradle/
+    remote_src: yes
+
+- name: Add Gradle to PATH
+  copy:
+    dest: /etc/profile.d/gradle.sh
+    content: |
+      export PATH=$PATH:/opt/gradle/gradle-7.5/bin
+
+- name: Replace compile with implementation in build.gradle
+  replace:
+    path: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/build.gradle
+    regexp: '\bcompile\b'
+    replace: 'implementation'
+
+- name: Replace testCompile with testImplementation in build.gradle
+  replace:
+    path: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/build.gradle
+    regexp: '\btestCompile\b'
+    replace: 'testImplementation'
+
+- name: Replace runtime with implementation in build.gradle
+  replace:
+    path: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/build.gradle
+    regexp: '\bruntime\b'
+    replace: 'implementation'
+
+- name: Create Gradle Wrapper
+  command: /opt/gradle/gradle-7.5/bin/gradle wrapper
+  args:
+    chdir: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}
+  register: gradlew_result
+
+- debug:
+    var: gradlew_result
+
+- name: Create start script for OFBiz
+  copy:
+    dest: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/startofbiz.sh
+    content: |
+      #!/bin/bash
+      cd /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}
+      ./gradlew ofbiz
+    mode: '0755'
+
+- name: Create stop script for OFBiz
+  copy:
+    dest: /opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/stopofbiz.sh
+    content: |
+      #!/bin/bash
+      pkill -f 'gradlew ofbiz'
+    mode: '0755'
+
+- name: Create systemd service file for OFBiz
+  template:
+    src: ofbiz.service.j2
+    dest: /etc/systemd/system/ofbiz.service
+
+- name: Reload systemd daemon
+  command: systemctl daemon-reload
+
+- name: Enable and start OFBiz service
+  systemd:
+    name: ofbiz
+    enabled: yes
+    state: started
+
+- name: Verify OFBiz is running
+  shell: curl -I http://localhost:8080 | grep "200 OK"
+  register: result
+  failed_when: "'200 OK' not in result.stdout"
+  retries: 5
+  delay: 10
+  until: result.stdout.find('200 OK') != -1
+
+- name: Output OFBiz startup verification
+  debug:
+    msg: "OFBiz is running successfully."
+  when: result.stdout.find('200 OK') != -1

@@ -1,0 +1,11 @@
+---
+- name: Install Zimbra from tar on Debian
+  hosts: all
+  become: true
+  vars:
+    zimbra_version: "9.0.0"
+    zimbra_tar_url: "https://files.zimbra.com/downloads/9.0.0_GA/zcs-NETWORK-9.0.0_GA_3924.UBUNTU18_64.20200331010312.tgz"
+  roles:
+    - role: zimbra_from_tar_on_debian
+      tags:
+        - install

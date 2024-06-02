@@ -1,0 +1,83 @@
+# roles/zimbra_from_tar_on_debian/tasks/main.yaml
+---
+- name: Ensure dependencies are installed
+  apt:
+    name: 
+      - wget
+      - tar
+      - perl
+      - netcat-openbsd
+      - sudo
+      - python3-pexpect
+      - expect
+    state: present
+    update_cache: yes
+
+- name: Download Zimbra tarball
+  get_url:
+    url: "{{ zimbra_tar_url }}"
+    dest: "/tmp/zimbra-{{ zimbra_version }}.tgz"
+    mode: '0755'
+
+- name: Extract Zimbra tarball
+  unarchive:
+    src: "/tmp/zimbra-{{ zimbra_version }}.tgz"
+    dest: "/tmp/"
+    remote_src: yes
+
+- name: Find extracted directory
+  find:
+    paths: /tmp/
+    patterns: 'zcs-NETWORK-{{ zimbra_version }}*'
+    file_type: directory
+  register: zimbra_extracted_dir
+
+- name: Debug found directory
+  debug:
+    var: zimbra_extracted_dir
+
+- name: Create expect script for Zimbra installation
+  copy:
+    dest: /tmp/install_zimbra.expect
+    content: |
+      #!/usr/bin/expect -f
+
+      set timeout -1
+      spawn sudo ./install.sh -s --platform-override --skip-activation-check
+      expect "Do you agree with the terms of the software license agreement?" { send "Y\r" }
+      expect "Use Zimbra's package repository" { send "Y\r" }
+      expect "Install zimbra-ldap" { send "Y\r" }
+      expect "Install zimbra-logger" { send "Y\r" }
+      expect "Install zimbra-mta" { send "Y\r" }
+      expect "Install zimbra-dnscache" { send "N\r" }
+      expect "Install zimbra-snmp" { send "Y\r" }
+      expect "Install zimbra-store" { send "Y\r" }
+      expect "Install zimbra-apache" { send "Y\r" }
+      expect "Install zimbra-spell" { send "Y\r" }
+      expect "Install zimbra-convertd" { send "Y\r" }
+      expect "Install zimbra-memcached" { send "Y\r" }
+      expect "Install zimbra-proxy" { send "Y\r" }
+      expect "Install zimbra-archiving" { send "N\r" }
+      expect "Install zimbra-drive" { send "Y\r" }
+      expect "Install zimbra-network-modules-ng" { send "Y\r" }
+      expect "The system will be modified. Continue?" { send "Y\r" }
+      expect eof
+  mode: '0755'
+
+- name: Run Zimbra installer with expect script
+  command: /tmp/install_zimbra.expect
+  args:
+    chdir: "{{ zimbra_extracted_dir.files[0].path }}"
+  when: zimbra_extracted_dir.matched > 0
+- name: Check if Zimbra installation directory exists
+  stat:
+    path: /opt/zimbra/bin
+  register: zimbra_install_dir
+
+- name: Debug Zimbra installation directory status
+  debug:
+    var: zimbra_install_dir
+
+- name: Start Zimbra service
+  command: "/opt/zimbra/bin/zmcontrol start"
+  when: zimbra_install_dir.stat.exists
