@@ -1,4 +1,5 @@
 ---
+# Section: Update and Install Required Packages
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -23,6 +24,7 @@
       - git
     state: present
 
+# Section: Download and Unzip ILIAS Source
 # - name: Download ILIAS source
 #   shell: wget -O /tmp/ilias.zip https://github.com/ILIAS-eLearning/ILIAS/releases/download/v9.1/ILIAS-9.1.zip
 
@@ -36,6 +38,7 @@
     dest: /tmp/
     remote_src: yes
 
+# Section: Debug and Prepare Web Directory
 - name: List contents of /tmp directory
   command: ls -l /tmp
   register: ls_output
@@ -61,13 +64,7 @@
   shell: mv /tmp/ILIAS-9.1/* /var/www/html/ilias/
   ignore_errors: yes
 
-# - name: Move ILIAS to web directory - alternate
-#   shell: rsync -av /tmp/ILIAS-9.1/ /var/www/html/ilias/
-#   when: result is failed
-
-# - name: Move ILIAS to web directory
-#   command: mv /tmp/ILIAS-9.1/* /var/www/html/ilias/
-
+# Section: Set Permissions and Configure Apache
 - name: Set permissions
   file:
     path: /var/www/html/ilias
@@ -107,6 +104,7 @@
     name: apache2
     state: restarted
 
+# Section: Secure MySQL Installation
 - name: Install debconf-utils
   apt:
     name: debconf-utils
@@ -118,19 +116,27 @@
     state: started
     enabled: yes
 
-- name: Secure MySQL installation and set root password
-  expect:
-    command: mysql_secure_installation
-    responses:
-      "Enter current password for root (enter for none):": ""
-      "Set root password?": "Y"
-      "New password:": "your_mysql_root_password"
-      "Re-enter new password:": "your_mysql_root_password"
-      "Remove anonymous users?": "Y"
-      "Disallow root login remotely?": "Y"
-      "Remove test database and access to it?": "Y"
-      "Reload privilege tables now?": "Y"
+- name: Stop MariaDB service
+  service:
+    name: mariadb
+    state: stopped
 
+- name: Set MySQL root password in a single script
+  shell: |
+    mysqld_safe --skip-grant-tables --skip-networking &
+    pid=$!
+    sleep 5
+    mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY 'your_mysql_root_password';"
+    kill $pid
+  ignore_errors: yes
+
+- name: Start MariaDB service normally
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+# Section: MySQL User and Database Configuration
 - name: Remove anonymous users
   mysql_user:
     name: ''
@@ -158,14 +164,11 @@
     - "::1"
 
 - name: Reload privilege tables
-  mysql_user:
-    name: root
-    host: localhost
-    password: "your_mysql_root_password"
-    priv: "RELOAD"
-    state: present
-    login_user: root
-    login_password: "your_mysql_root_password"
+  command: mysqladmin flush-privileges
+  args:
+    executable: /bin/bash
+  environment:
+    MYSQL_PWD: "your_mysql_root_password"
 
 - name: Create ILIAS database
   mysql_db:
