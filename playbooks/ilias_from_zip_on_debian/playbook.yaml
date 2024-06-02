@@ -1,13 +1,207 @@
-- name: Install ILIAS from zip on Debian
+---
+- name: Install ILIAS on Debian 12
   hosts: all
-  become: true
+  become: yes
+
   vars:
-    ilias_version: "latest"
-    ilias_zip_url: "https://docu.ilias.de/ilias.php?baseClass=illmpresentationgui&cmd=resume&ref_id=1719"
-  roles:
-    - role: ilias_from_zip_on_debian
-      vars:
-        ilias_from_zip_on_debian_version: "{{ ilias_version }}"
-        ilias_from_zip_on_debian_url: "{{ ilias_zip_url }}"
-      tags:
-        - install
+    ilias_db_password: "your_db_password"
+    ilias_admin_email: "admin@example.com"
+    ilias_site_url: "http://your_ilias_site_url"
+    ilias_data_dir: "/var/www/files"
+    ilias_docroot: "/var/www/html"
+    ilias_version: "release_9"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - apache2
+          - mariadb-server
+          - php
+          - php-gd
+          - php-xml
+          - php-mysql
+          - php-mbstring
+          - php-imagick
+          - php-zip
+          - php-intl
+          - openjdk-17-jdk
+          - imagemagick
+          - git
+          - composer
+          - npm
+        state: present
+
+    - name: Enable Apache mod_rewrite
+      apache2_module:
+        name: rewrite
+        state: present
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Set PHP configuration
+      blockinfile:
+        path: /etc/php/8.2/apache2/php.ini
+        block: |
+          max_execution_time = 600
+          memory_limit = 512M
+          error_reporting = E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT
+          display_errors = Off
+          post_max_size = 256M
+          upload_max_filesize = 256M
+          session.gc_probability = 1
+          session.gc_divisor = 100
+          session.gc_maxlifetime = 14400
+          session.hash_function = 0
+          session.cookie_httponly = On
+          allow_url_fopen = 1
+          max_input_vars = 10000
+
+    - name: Restart Apache after PHP configuration change
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Create MySQL database and user
+      mysql_db:
+        name: ilias
+        state: present
+
+    - name: Create MySQL user
+      mysql_user:
+        name: ilias
+        password: "{{ ilias_db_password }}"
+        priv: 'ilias.*:ALL'
+        host: localhost
+        state: present
+
+    - name: Clone ILIAS repository
+      git:
+        repo: https://github.com/ILIAS-eLearning/ILIAS.git
+        dest: "{{ ilias_docroot }}"
+        version: "{{ ilias_version }}"
+        force: yes
+
+    - name: Install PHP dependencies with Composer
+      composer:
+        command: install
+        no_dev: yes
+        working_dir: "{{ ilias_docroot }}"
+
+    - name: Install JavaScript dependencies with npm
+      command: npm clean-install --omit=dev --ignore-scripts
+      args:
+        chdir: "{{ ilias_docroot }}"
+
+    - name: Create ILIAS data directory
+      file:
+        path: "{{ ilias_data_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Set ownership for ILIAS directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        recurse: yes
+      loop:
+        - "{{ ilias_docroot }}"
+        - "{{ ilias_data_dir }}"
+
+    - name: Copy minimal config for ILIAS
+      copy:
+        dest: /etc/ilias-minimal-config.json
+        content: |
+          {
+              "common": {
+                  "client_id": "myilias"
+              },
+              "database": {
+                  "user": "ilias",
+                  "password": "{{ ilias_db_password }}"
+              },
+              "filesystem": {
+                  "data_dir": "{{ ilias_data_dir }}"
+              },
+              "http": {
+                  "path": "{{ ilias_site_url }}"
+              },
+              "language": {
+                  "default_language": "en",
+                  "install_languages": ["en"]
+              },
+              "logging": {
+                  "enable": true,
+                  "path_to_logfile": "/var/log/ilias/ilias.log",
+                  "errorlog_dir": "/var/log/ilias/"
+              },
+              "systemfolder": {
+                  "contact": {
+                      "firstname": "Admin",
+                      "lastname": "User",
+                      "email": "{{ ilias_admin_email }}"
+                  }
+              },
+              "utilities": {
+                  "path_to_convert": "/usr/bin/convert"
+              }
+          }
+
+    - name: Run ILIAS setup
+      command: php setup/setup.php install /etc/ilias-minimal-config.json
+      args:
+        chdir: "{{ ilias_docroot }}"
+
+    - name: Configure Apache virtual host for ILIAS
+      blockinfile:
+        path: /etc/apache2/sites-available/000-default.conf
+        block: |
+          <VirtualHost *:80>
+              ServerAdmin {{ ilias_admin_email }}
+              DocumentRoot {{ ilias_docroot }}
+              <Directory {{ ilias_docroot }}>
+                  Options FollowSymLinks -Indexes
+                  AllowOverride All
+                  Require all granted
+              </Directory>
+              LogLevel warn
+              ErrorLog /var/log/apache2/error.log
+              CustomLog /var/log/apache2/access.log combined
+          </VirtualHost>
+
+    - name: Restart Apache to apply new configuration
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Remove anonymous MySQL users
+      mysql_user:
+        name: ''
+        host_all: yes
+        state: absent
+
+    - name: Remove test database
+      mysql_db:
+        name: test
+        state: absent
+
+    - name: Remove remote root login capability
+      mysql_user:
+        name: root
+        host: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ansible_fqdn }}"
+        - 127.0.0.1
+        - ::1
