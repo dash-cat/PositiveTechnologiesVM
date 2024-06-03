@@ -68,10 +68,23 @@
               - gnupg
               - apt-transport-https
               - unzip
+    - name: Add the AdoptOpenJDK GPG Key
+      apt_key:
+        url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+        state: present
 
-    - name: "Install OpenJDK 8 from Debian repositories"
+    - name: Add the AdoptOpenJDK APT Repository
+      apt_repository:
+        repo: "deb https://packages.adoptium.net/artifactory/deb/ {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: Update the APT Package List
       apt:
-        name: openjdk-8-jdk
+        update_cache: yes
+
+    - name: Install Temurin JDK 8
+      apt:
+        name: temurin-8-jdk
         state: present
 
 - name: "Arch Linux packages"
@@ -179,7 +192,7 @@
         owner: "{{ ofbiz_user }}"
         group: "{{ ofbiz_user_group }}"
         mode: 0644
-        # checksum: "{{ ofbiz_checksum }}"
+        checksum: "{{ ofbiz_checksum }}"
         use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
       when: not _ofbiz_zip_archive_file.stat.exists
 
