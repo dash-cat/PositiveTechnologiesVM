@@ -123,6 +123,12 @@
         state: started
       when: not mysql_service_status.failed
 
+    - name: Drop existing ILIAS database if it exists
+      community.mysql.mysql_db:
+        name: ilias
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
 
     - name: Create MySQL database
       community.mysql.mysql_db:
@@ -259,6 +265,11 @@
                   "path_to_convert": "/usr/bin/convert"
               }
           }
+
+    - name: Copy modified SQL dump file
+      ansible.builtin.copy:
+        src: ilias3_modified.sql
+        dest: /var/www/html/ilias/setup/sql/ilias3_modified.sql
 
     - name: Run ILIAS setup
       ansible.builtin.shell: php setup/setup.php -y install /etc/ilias-minimal-config.json
