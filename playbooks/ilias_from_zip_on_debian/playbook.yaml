@@ -146,13 +146,31 @@
         url: https://github.com/ILIAS-eLearning/ILIAS/releases/download/v9.1/ILIAS-9.1.zip
         dest: /tmp/ILIAS-9.1.zip
 
+    - name: Ensure ILIAS docroot directory exists
+      ansible.builtin.file:
+        path: "{{ ilias_docroot }}"
+        state: directory
+        owner: www-data
+        group: www-data
+
     - name: Unzip ILIAS archive
-      ansible.builtin.unarchive:
-        src: /tmp/ILIAS-9.1.zip
-        dest: "{{ ilias_docroot }}"
-        remote_src: yes
+      ansible.builtin.shell:
+        cmd: "unzip /tmp/ILIAS-9.1.zip -d {{ ilias_docroot }}"
       become: yes
       become_user: www-data
+
+    - name: Move ILIAS files to the correct location
+      ansible.builtin.shell:
+        cmd: "mv {{ ilias_docroot }}/ILIAS-9.1/* {{ ilias_docroot }}/"
+      become: yes
+      become_user: www-data
+
+    - name: Remove top-level ILIAS directory
+      ansible.builtin.shell:
+        cmd: "rm -rf {{ ilias_docroot }}/ILIAS-9.1"
+      become: yes
+      become_user: www-data
+
 
     - name: Ensure www-data has ownership of the ILIAS directory
       ansible.builtin.file:
@@ -243,7 +261,7 @@
           }
 
     - name: Run ILIAS setup
-      ansible.builtin.command: php setup/setup.php install /etc/ilias-minimal-config.json
+      ansible.builtin.shell: php setup/setup.php -y install /etc/ilias-minimal-config.json
       args:
         chdir: "{{ ilias_docroot }}"
 
