@@ -1,4 +1,3 @@
----
 - name: Install ILIAS on Debian 12
   hosts: all
   become: yes
@@ -8,17 +7,27 @@
     ilias_admin_email: "admin@example.com"
     ilias_site_url: "http://your_ilias_site_url"
     ilias_data_dir: "/var/www/files"
-    ilias_docroot: "/var/www/html"
+    ilias_docroot: "/var/www/html/ilias"
     ilias_version: "release_9"
+    mysql_root_password: "your_mysql_root_password"
 
   tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+    - name: Install ntpdate
+      ansible.builtin.apt:
+        name: ntpdate
+        state: present
+
+    - name: Sync system time
+      ansible.builtin.command: ntpdate -u pool.ntp.org
 
     - name: Install required packages
-      apt:
+      ansible.builtin.apt:
         name:
+          - build-essential
+          - default-libmysqlclient-dev
+          - python3-dev
+          - python3-pip
+          - python3
           - apache2
           - mariadb-server
           - php
@@ -36,18 +45,27 @@
           - npm
         state: present
 
+    - name: Install MySQL Python dependencies
+      ansible.builtin.apt:
+        name:
+          - python3-pymysql
+          - default-libmysqlclient-dev
+        state: present
+        update_cache: yes
+
+
     - name: Enable Apache mod_rewrite
-      apache2_module:
+      ansible.builtin.apache2_module:
         name: rewrite
         state: present
 
     - name: Restart Apache
-      service:
+      ansible.builtin.service:
         name: apache2
         state: restarted
 
     - name: Set PHP configuration
-      blockinfile:
+      ansible.builtin.blockinfile:
         path: /etc/php/8.2/apache2/php.ini
         block: |
           max_execution_time = 600
@@ -65,43 +83,109 @@
           max_input_vars = 10000
 
     - name: Restart Apache after PHP configuration change
-      service:
+      ansible.builtin.service:
         name: apache2
         state: restarted
 
-    - name: Create MySQL database and user
-      mysql_db:
+    - name: Ensure .my.cnf exists for root user
+      ansible.builtin.file:
+        path: /root/.my.cnf
+        state: touch
+        mode: '0600'
+
+    - name: Add MySQL root credentials to .my.cnf
+      ansible.builtin.lineinfile:
+        path: /root/.my.cnf
+        create: true
+        line: "{{ item }}"
+        mode: '0600'
+      with_items:
+        - "[client]"
+        - "user=root"
+        - "password={{ mysql_root_password }}"
+
+    - name: Set MySQL root password
+      ansible.builtin.shell: >
+        mysql -u root --execute "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}';"
+      register: set_root_password
+
+    - name: Ensure MySQL service is started
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+      register: mysql_service_status
+
+    - name: Wait for MySQL to be available
+      ansible.builtin.wait_for:
+        port: 3306
+        host: localhost
+        delay: 10
+        state: started
+      when: not mysql_service_status.failed
+
+
+    - name: Create MySQL database
+      community.mysql.mysql_db:
         name: ilias
         state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
 
-    - name: Create MySQL user
-      mysql_user:
+    - name: Create MySQL user and grant privileges
+      community.mysql.mysql_user:
         name: ilias
         password: "{{ ilias_db_password }}"
-        priv: 'ilias.*:ALL'
+        priv: "ilias.*:ALL"
         host: localhost
         state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
 
-    - name: Clone ILIAS repository
-      git:
-        repo: https://github.com/ILIAS-eLearning/ILIAS.git
+    - name: Download ILIAS zip archive
+      ansible.builtin.get_url:
+        url: https://github.com/ILIAS-eLearning/ILIAS/releases/download/v9.1/ILIAS-9.1.zip
+        dest: /tmp/ILIAS-9.1.zip
+
+    - name: Unzip ILIAS archive
+      ansible.builtin.unarchive:
+        src: /tmp/ILIAS-9.1.zip
         dest: "{{ ilias_docroot }}"
-        version: "{{ ilias_version }}"
-        force: yes
+        remote_src: yes
+      become: yes
+      become_user: www-data
+
+    - name: Ensure www-data has ownership of the ILIAS directory
+      ansible.builtin.file:
+        path: "{{ ilias_docroot }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Install required PHP extensions
+      ansible.builtin.apt:
+        name: 
+          - php-curl
+          - php-mbstring
+          - php-xml
+        state: present
+      become: yes
 
     - name: Install PHP dependencies with Composer
-      composer:
-        command: install
-        no_dev: yes
-        working_dir: "{{ ilias_docroot }}"
+      ansible.builtin.command: composer install --no-dev --optimize-autoloader
+      args:
+        chdir: "{{ ilias_docroot }}"
+      become: yes
+      become_user: www-data
+
 
     - name: Install JavaScript dependencies with npm
-      command: npm clean-install --omit=dev --ignore-scripts
+      ansible.builtin.command: npm clean-install --omit=dev --ignore-scripts
       args:
         chdir: "{{ ilias_docroot }}"
 
     - name: Create ILIAS data directory
-      file:
+      ansible.builtin.file:
         path: "{{ ilias_data_dir }}"
         state: directory
         owner: www-data
@@ -109,7 +193,7 @@
         mode: '0755'
 
     - name: Set ownership for ILIAS directories
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         owner: www-data
@@ -120,7 +204,7 @@
         - "{{ ilias_data_dir }}"
 
     - name: Copy minimal config for ILIAS
-      copy:
+      ansible.builtin.copy:
         dest: /etc/ilias-minimal-config.json
         content: |
           {
@@ -159,13 +243,13 @@
           }
 
     - name: Run ILIAS setup
-      command: php setup/setup.php install /etc/ilias-minimal-config.json
+      ansible.builtin.command: php setup/setup.php install /etc/ilias-minimal-config.json
       args:
         chdir: "{{ ilias_docroot }}"
 
     - name: Configure Apache virtual host for ILIAS
-      blockinfile:
-        path: /etc/apache2/sites-available/000-default.conf
+      ansible.builtin.blockinfile:
+        path: /etc/apache2/sites-available/ilias.conf
         block: |
           <VirtualHost *:80>
               ServerAdmin {{ ilias_admin_email }}
@@ -180,28 +264,37 @@
               CustomLog /var/log/apache2/access.log combined
           </VirtualHost>
 
+    - name: Enable ILIAS site
+      ansible.builtin.command: a2ensite ilias.conf
+
     - name: Restart Apache to apply new configuration
-      service:
+      ansible.builtin.service:
         name: apache2
         state: restarted
 
-    - name: Remove anonymous MySQL users
-      mysql_user:
-        name: ''
-        host_all: yes
-        state: absent
+    # - name: Remove anonymous MySQL users
+    #   community.mysql.mysql_user:
+    #     name: ''
+    #     host_all: yes
+    #     state: absent
+    #     login_user: root
+    #     login_password: "{{ mysql_root_password }}"
 
-    - name: Remove test database
-      mysql_db:
-        name: test
-        state: absent
+    # - name: Remove test database
+    #   community.mysql.mysql_db:
+    #     name: test
+    #     state: absent
+    #     login_user: root
+    #     login_password: "{{ mysql_root_password }}"
 
-    - name: Remove remote root login capability
-      mysql_user:
-        name: root
-        host: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ ansible_fqdn }}"
-        - 127.0.0.1
-        - ::1
+    # - name: Remove remote root login capability
+    #   community.mysql.mysql_user:
+    #     name: root
+    #     host: "{{ item }}"
+    #     state: absent
+    #     login_user: root
+    #     login_password: "{{ mysql_root_password }}"
+    #   loop:
+    #     - "{{ ansible_fqdn }}"
+    #     - 127.0.0.1
+    #     - ::1
