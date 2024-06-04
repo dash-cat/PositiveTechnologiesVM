@@ -1,5 +1,5 @@
 ---
-ofbiz_from_zip_on_debian12_version: "18.12.06"
+ofbiz_from_zip_on_debian12_version: "18.12.14"
 ofbiz_version: "18.12.14"
 
 ofbiz_java_opts: "-Xmx2048m"

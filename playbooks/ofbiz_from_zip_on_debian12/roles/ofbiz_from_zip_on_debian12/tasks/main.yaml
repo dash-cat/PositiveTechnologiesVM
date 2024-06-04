@@ -160,25 +160,25 @@
         path: "{{ ofbiz_user_home }}/downloads/KEYS"
       register: _gpg_keys_file
 
-    - name: "Download OFBiz developers GPG keys 'KEYS'"
-      get_url:
-        dest: "{{ ofbiz_user_home }}/downloads/KEYS"
-        url: https://downloads.apache.org/ofbiz/KEYS
-        owner: "{{ ofbiz_user }}"
-        group: "{{ ofbiz_user_group }}"
-        mode: 0644
-        checksum: "{{ _ofbiz_dev_gpg_keys_checksum }}"
-        use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
-      register: _ofbiz_dev_keys
-      when: not _gpg_keys_file.stat.exists
+    # - name: "Download OFBiz developers GPG keys 'KEYS'"
+    #   get_url:
+    #     dest: "{{ ofbiz_user_home }}/downloads/KEYS"
+    #     url: https://downloads.apache.org/ofbiz/KEYS
+    #     owner: "{{ ofbiz_user }}"
+    #     group: "{{ ofbiz_user_group }}"
+    #     mode: 0644
+    #     checksum: "{{ _ofbiz_dev_gpg_keys_checksum }}"
+    #     use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
+    #   register: _ofbiz_dev_keys
+    #   when: not _gpg_keys_file.stat.exists
 
-    - name: "Import OFBiz developers GPG keys"
-      command: gpg --import KEYS
-      args:
-        chdir: "{{ ofbiz_user_home }}/downloads"
-      become: true
-      become_user: "{{ ofbiz_user }}"
-      when: _ofbiz_dev_keys.changed
+    # - name: "Import OFBiz developers GPG keys"
+    #   command: gpg --import KEYS
+    #   args:
+    #     chdir: "{{ ofbiz_user_home }}/downloads"
+    #   become: true
+    #   become_user: "{{ ofbiz_user }}"
+    #   when: _ofbiz_dev_keys.changed
 
     - name: "Check the existence of {{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
       stat:
@@ -188,65 +188,70 @@
     - name: "Download OFBiz ZIP file"
       get_url:
         dest: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
-        url: "https://mirror.csclub.uwaterloo.ca/apache/ofbiz/apache-ofbiz-{{ ofbiz_version }}.zip"
+        url: "https://dlcdn.apache.org/ofbiz/apache-ofbiz-{{ ofbiz_version }}.zip"
         owner: "{{ ofbiz_user }}"
         group: "{{ ofbiz_user_group }}"
         mode: 0644
-        checksum: "{{ ofbiz_checksum }}"
         use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
       when: not _ofbiz_zip_archive_file.stat.exists
 
-    - name: "Check the existence of {{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-      stat:
-        path: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-      register: _ofbiz_gpg_signature_file
+    # - name: "Check the existence of {{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
+    #   stat:
+    #     path: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
+    #   register: _ofbiz_gpg_signature_file
 
-    - name: "Download OFBiz GPG signature"
-      get_url:
-        dest: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-        url: "https://downloads.apache.org/ofbiz/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-        owner: "{{ ofbiz_user }}"
-        group: "{{ ofbiz_user_group }}"
-        mode: 0644
-        use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
-      when: not _ofbiz_gpg_signature_file.stat.exists
+    # - name: "Download OFBiz GPG signature"
+    #   get_url:
+    #     dest: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
+    #     url: "https://downloads.apache.org/ofbiz/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
+    #     owner: "{{ ofbiz_user }}"
+    #     group: "{{ ofbiz_user_group }}"
+    #     mode: 0644
+    #     use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
+    #   when: not _ofbiz_gpg_signature_file.stat.exists
 
-    - name: "Check GPG signature of Apache OFBiz ZIP file"
-      command:
-        argv:
-          - "gpg"
-          - "--verify"
-          - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-          - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
-      args:
-        chdir: "{{ ofbiz_user_home }}/downloads"
-      become: true
-      become_user: "{{ ofbiz_user }}"
-      changed_when: false
+    # - name: "Check GPG signature of Apache OFBiz ZIP file"
+    #   command:
+    #     argv:
+    #       - "gpg"
+    #       - "--verify"
+    #       - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
+    #       - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
+    #   args:
+    #     chdir: "{{ ofbiz_user_home }}/downloads"
+    #   become: true
+    #   become_user: "{{ ofbiz_user }}"
+    #   changed_when: false
 
-- name: "Extract OFBiz archive"
-  block:
-    - name: "Create the directory where OFBiz will be extracted"
-      file:
-        state: directory
-        path: "{{ item }}"
-        owner: "{{ ofbiz_user }}"
-        group: "{{ ofbiz_user_group }}"
-        mode: 0755
-      loop:
-        - "{{ ofbiz_user_home }}/ofbiz"
-        - "{{ _ofbiz_dir }}"
+    - name: "Extract OFBiz archive"
+      block:
+        - name: "Create the directory where OFBiz will be extracted"
+          file:
+            state: directory
+            path: "{{ item }}"
+            owner: "{{ ofbiz_user }}"
+            group: "{{ ofbiz_user_group }}"
+            mode: 0755
+          loop:
+            - "{{ ofbiz_user_home }}/ofbiz"
+            - "{{ _ofbiz_dir }}"
+
+    - name: Ensure ACL package is installed
+      apt:
+        name: acl
+        state: present
+      become: yes
+
 
     - name: "Extract Apache OFBiz"
-      unarchive:
-        src: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
-        dest: "{{ _ofbiz_dir }}"
-        remote_src: true
-        owner: "{{ ofbiz_user }}"
-        group: "{{ ofbiz_user_group }}"
-        creates: "{{ _ofbiz_extraction_dir }}"
+      shell: |
+        unzip -o "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip" -d "{{ _ofbiz_dir }}"
+      args:
+        creates: "{{ _ofbiz_extraction_dir }}/README.md" # or any file that is expected to be in the root of the extracted folder
+      become: true
+      become_user: "{{ ofbiz_user }}"
 
-    - name: "File {{ ofbiz_user_home }}/env.sh"
+    - name: "cool"
       copy:
         dest: "{{ ofbiz_user_home }}/env.sh"
         owner: "{{ ofbiz_user }}"
@@ -278,15 +283,13 @@
         group: "{{ ofbiz_user_group }}"
 
     - name: "Run: gradle/init-gradle-wrapper.sh"
-      command:
-        argv:
-          - './gradle/init-gradle-wrapper.sh'
+      command: ./gradle/init-gradle-wrapper.sh
       args:
-        warn: false
         chdir: "{{ _ofbiz_extraction_dir }}"
         creates: "{{ _ofbiz_extraction_dir }}/gradle/wrapper/gradle-wrapper.jar"
       become: true
       become_user: "{{ ofbiz_user }}"
+
 
     - name: "Add lines to gradlew"
       lineinfile:
@@ -296,3 +299,49 @@
       loop:
         - 'source {{ ofbiz_user_home }}/env.sh'
         - '[[ `id -u` -eq 0 ]] && exit 1'
+    
+    # - name: Set JAVA_HOME and update PATH
+    #   become: yes
+    #   lineinfile:
+    #     path: /etc/environment
+    #     state: present
+    #     line: "{{ item }}"
+    #   with_items:
+    #     - 'JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64'
+    #     - 'PATH=$JAVA_HOME/bin:$PATH'
+
+    - name: Create OFBiz Systemd service file
+      become: yes
+      copy:
+        dest: /etc/systemd/system/ofbiz.service
+        content: |
+          [Unit]
+          Description=Apache OFBiz
+          After=network.target
+
+          [Service]
+          User={{ ofbiz_user }}
+          Group={{ ofbiz_user_group }}
+          WorkingDirectory={{ _ofbiz_extraction_dir }}
+          ExecStartPre=/bin/bash -c 'echo $JAVA_HOME; $JAVA_HOME/bin/java -version'
+          ExecStart=bash {{ _ofbiz_extraction_dir }}/gradlew ofbiz
+          Restart=always
+          Environment="JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64"
+          Environment="PATH=/usr/lib/jvm/temurin-8-jdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+          [Install]
+          WantedBy=multi-user.target
+
+
+    - name: Reload Systemd daemon
+      become: yes
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start OFBiz service
+      become: yes
+      systemd:
+        name: ofbiz
+        enabled: yes
+        state: started
+
