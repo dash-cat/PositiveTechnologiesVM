@@ -1,0 +1,11 @@
+{
+    "name": "ilias",
+    "detect": {
+        "type": "shell",
+        "command": "grep -oP '(?<=ILIAS_VERSION_NUMERIC = \")[^\"]*' /var/www/html/ilias/include/inc.ilias_version.php"
+    },
+    "cpe": {
+        "app": "ilias",
+        "manufacturer": "ilias"
+    }
+}

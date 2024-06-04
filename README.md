@@ -1,5 +1,6 @@
 ## Searching for CPEs
 
+NOT CHECKED
 keycloack 2
 strongSwan 2
 Python3 2
@@ -7,6 +8,11 @@ nginx unit 2
 
 TODO
 WireGuard 3
++Keycloak 3 (requirements.txt)
++strongSwan 3 (requirements.txt)
++saltstack 3
+
+
 
 sudo hwclock --hctosys 
 new_password

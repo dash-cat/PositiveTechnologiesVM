@@ -1,0 +1,5 @@
+---
+osticket_from_zip_on_debian_version: "1.18.1"
+osticket_from_zip_on_debian_base_url: "https://github.com/osTicket/osTicket/releases/download/v{{ osticket_from_zip_on_debian_version }}"
+osticket_from_zip_on_debian_url: "{{ osticket_from_zip_on_debian_base_url }}/osTicket-v{{ osticket_from_zip_on_debian_version }}.zip"
+osticket_from_zip_on_debian_install_dir: "/var/www/osticket"

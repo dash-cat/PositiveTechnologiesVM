@@ -1,0 +1,190 @@
+---
+- name: "Debian packages"
+  when: ansible_distribution == "Debian"
+  block:
+    - name: "Update apt cache"
+      ansible.builtin.apt:
+        force_apt_get: true
+        update_cache: true
+        cache_valid_time: 3600
+      changed_when: false
+
+- name: Install coreutils
+  ansible.builtin.apt:
+    name: coreutils
+    state: present
+
+- name: Add the AdoptOpenJDK GPG Key
+  ansible.builtin.apt_key:
+    url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+    state: present
+
+- name: Add the AdoptOpenJDK APT Repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.adoptium.net/artifactory/deb/ {{ ansible_distribution_release }} main"
+    state: present
+
+- name: Update the APT Package List
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Temurin JDK 8
+  ansible.builtin.apt:
+    name: temurin-8-jdk
+    state: present
+
+- name: "Create group '{{ ofbiz_from_zip_on_debian12_user_group }}'"
+  ansible.builtin.group:
+    name: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    gid: "{{ ofbiz_from_zip_on_debian12_user_gid }}"
+
+- name: "Create user '{{ ofbiz_from_zip_on_debian12_user }}'"
+  ansible.builtin.user:
+    name: "{{ ofbiz_from_zip_on_debian12_user }}"
+    uid: "{{ ofbiz_from_zip_on_debian12_user_uid }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    home: "{{ ofbiz_from_zip_on_debian12_user_home }}"
+    shell: "{{ ofbiz_from_zip_on_debian12_user_shell }}"
+    createhome: true
+
+- name: "Dir permissions {{ ofbiz_from_zip_on_debian12_user_home }}"
+  ansible.builtin.file:
+    state: directory
+    path: "{{ ofbiz_from_zip_on_debian12_user_home }}"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    mode: 448
+
+- name: "File /.bashrc"
+  ansible.builtin.copy:
+    dest: "{{ ofbiz_from_zip_on_debian12_user_home }}/.bashrc"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    mode: 420
+    content: |
+      # ~/.bashrc
+      # If not running interactively, don't do anything
+      [[ $- != *i* ]] && return
+      alias ls='ls --color=auto'
+      PS1='[\u@\h \W]\$ '
+      source "{{ (ofbiz_from_zip_on_debian12_user_home + '/env.sh') }}"
+
+- name: "Create OFBiz downloads directory"
+  ansible.builtin.file:
+    state: directory
+    path: "{{ ofbiz_from_zip_on_debian12_user_home }}/downloads"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    mode: 493
+
+- name: "Download OFBiz ZIP file"
+  ansible.builtin.get_url:
+    dest: "{{ ofbiz_from_zip_on_debian12_user_home }}/downloads/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+    url: "https://dlcdn.apache.org/ofbiz/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+    mode: 420
+
+- name: "Extract OFBiz archive"
+  block:
+    - name: "Create the directory where OFBiz will be extracted"
+      ansible.builtin.file:
+        state: directory
+        path: "{{ item }}"
+        owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+        group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+        mode: 493
+      loop:
+        - "{{ ofbiz_from_zip_on_debian12_user_home }}/ofbiz"
+        - "{{ ofbiz_from_zip_on_debian12_dir }}"
+
+- name: Ensure ACL package is installed
+  ansible.builtin.apt:
+    name: acl
+    state: present
+  become: true
+
+
+- name: "Extract Apache OFBiz"
+  ansible.builtin.unarchive:
+    src: "{{ ofbiz_from_zip_on_debian12_user_home }}/downloads/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}.zip"
+    dest: "{{ ofbiz_from_zip_on_debian12_dir }}"
+    creates: "{{ ofbiz_from_zip_on_debian12_ex_dir }}/README.md"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    copy: false
+  become: true
+
+- name: "Link current"
+  ansible.builtin.file:
+    state: link
+    dest: "{{ ofbiz_from_zip_on_debian12_user_home }}/current"
+    src: "{{ ofbiz_from_zip_on_debian12_ex_dir }}"
+    owner: "{{ ofbiz_from_zip_on_debian12_user }}"
+    group: "{{ ofbiz_from_zip_on_debian12_user_group }}"
+
+- name: Set default Java version to Java 8
+  community.general.alternatives:
+    name: java
+    link: /usr/bin/java
+    path: /usr/lib/jvm/temurin-8-jdk-amd64/bin/java
+    priority: 1081
+  become: true
+
+- name: "Run: gradle/init-gradle-wrapper.sh"
+  ansible.builtin.command: bash ./gradle/init-gradle-wrapper.sh
+  args:
+    chdir: "{{ ofbiz_from_zip_on_debian12_ex_dir }}"
+    creates: "{{ ofbiz_from_zip_on_debian12_ex_dir }}/gradle/wrapper/gradle-wrapper.jar"
+  become: true
+  become_user: "{{ ofbiz_from_zip_on_debian12_user }}"
+
+
+- name: "Add lines to gradlew"
+  ansible.builtin.lineinfile:
+    path: "{{ ofbiz_from_zip_on_debian12_ex_dir }}/gradlew"
+    insertafter: '^#!/usr/bin/env sh'
+    line: "{{ item }}"
+  loop:
+    - 'source {{ ofbiz_from_zip_on_debian12_user_home }}/env.sh'
+    - '[[ `id -u` -eq 0 ]] && exit 1'
+
+- name: Create OFBiz Systemd service file
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ofbiz.service
+    content: |
+      [Unit]
+      Description=Apache OFBiz
+      After=network.target
+
+      [Service]
+      User={{ ofbiz_from_zip_on_debian12_user }}
+      Group={{ ofbiz_from_zip_on_debian12_user_group }}
+      WorkingDirectory={{ ofbiz_from_zip_on_debian12_ex_dir }}
+      ExecStartPre=/bin/bash -c 'echo $JAVA_HOME; $JAVA_HOME/bin/java -version'
+      ExecStart=bash {{ ofbiz_from_zip_on_debian12_ex_dir }}/gradlew ofbiz
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: 420
+
+- name: Reload Systemd daemon
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start OFBiz service
+  become: true
+  ansible.builtin.systemd:
+    name: ofbiz
+    enabled: true
+    state: started
+
+- name: Set read and execute permissions for others in /opt/ofbiz/
+  ansible.builtin.file:
+    path: /opt/ofbiz/
+    recurse: yes
+    others: yes
+    mode: 'o+rx'
+  become: true

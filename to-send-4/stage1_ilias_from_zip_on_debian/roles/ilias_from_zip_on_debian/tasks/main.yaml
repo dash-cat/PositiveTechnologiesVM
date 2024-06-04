@@ -1,0 +1,187 @@
+---
+# Section: Update and Install Required Packages
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - apache2
+      - php
+      - php-mysql
+      - php-xml
+      - php-zip
+      - php-curl
+      - php-mbstring
+      - libapache2-mod-php
+      - mariadb-server
+      - wget
+      - unzip
+      - build-essential
+      - libtool
+      - autoconf
+      - git
+    state: present
+
+# Section: Download and Unzip ILIAS Source
+# - name: Download ILIAS source
+#   shell: wget -O /tmp/ilias.zip https://github.com/ILIAS-eLearning/ILIAS/releases/download/v9.1/ILIAS-9.1.zip
+
+- name: Check if the downloaded file is a valid ZIP
+  command: file /tmp/ilias.zip
+  register: file_type
+
+- name: Unzip ILIAS source
+  unarchive:
+    src: /tmp/ilias.zip
+    dest: /tmp/
+    remote_src: yes
+
+# Section: Debug and Prepare Web Directory
+- name: List contents of /tmp directory
+  command: ls -l /tmp
+  register: ls_output
+
+- name: Debug output of ls command
+  debug:
+    var: ls_output.stdout
+
+- name: Ensure the web directory is empty
+  file:
+    path: /var/www/html/ilias
+    state: absent
+
+- name: Create the web directory
+  file:
+    path: /var/www/html/ilias
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Move ILIAS to web directory
+  shell: mv /tmp/ILIAS-9.1/* /var/www/html/ilias/
+  ignore_errors: yes
+
+# Section: Set Permissions and Configure Apache
+- name: Set permissions
+  file:
+    path: /var/www/html/ilias
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+    recurse: yes
+
+- name: Configure Apache for ILIAS
+  copy:
+    content: |
+      <VirtualHost *:80>
+          ServerAdmin webmaster@localhost
+          DocumentRoot /var/www/html/ilias
+          <Directory /var/www/html/ilias>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+          ErrorLog ${APACHE_LOG_DIR}/error.log
+          CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+    dest: /etc/apache2/sites-available/ilias.conf
+
+- name: Enable ILIAS site
+  command: a2ensite ilias.conf
+
+- name: Disable default site
+  command: a2dissite 000-default.conf
+
+- name: Enable Apache rewrite module
+  command: a2enmod rewrite
+
+- name: Restart Apache
+  service:
+    name: apache2
+    state: restarted
+
+# Section: Secure MySQL Installation
+- name: Install debconf-utils
+  apt:
+    name: debconf-utils
+    state: present
+
+- name: Start MariaDB service
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Stop MariaDB service
+  service:
+    name: mariadb
+    state: stopped
+
+- name: Set MySQL root password in a single script
+  shell: |
+    nohup sudo mysqld_safe --skip-grant-tables --skip-networking > mysqld_safe.log 2>&1 &
+    pid=$!
+    sleep 5
+    mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY 'your_mysql_root_password';"
+    kill $pid
+  ignore_errors: yes
+
+- name: Start MariaDB service normally
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+# Section: MySQL User and Database Configuration
+- name: Remove anonymous users
+  mysql_user:
+    name: ''
+    host_all: true
+    state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
+
+- name: Remove test database
+  mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
+
+- name: Remove remote root login
+  mysql_user:
+    name: root
+    host: "{{ item }}"
+    state: absent
+    login_user: root
+    login_password: "your_mysql_root_password"
+  with_items:
+    - "%"
+    - "::1"
+
+- name: Reload privilege tables
+  command: mysqladmin flush-privileges
+  args:
+    executable: /bin/bash
+  environment:
+    MYSQL_PWD: "your_mysql_root_password"
+
+- name: Create ILIAS database
+  mysql_db:
+    name: ilias_db
+    state: present
+    login_user: root
+    login_password: "your_mysql_root_password"
+
+- name: Create ILIAS database user
+  mysql_user:
+    name: ilias_user
+    password: "your_ilias_db_password"
+    priv: "ilias_db.*:ALL"
+    state: present
+    login_user: root
+    login_password: "your_mysql_root_password"

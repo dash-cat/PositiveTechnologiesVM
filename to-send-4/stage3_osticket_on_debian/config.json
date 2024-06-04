@@ -1,0 +1,11 @@
+{
+    "name": "osticket",
+    "detect": {
+        "type": "shell",
+        "command": "grep 'THIS_VERSION' /var/www/osticket/upload/bootstrap.php | awk -F\\' '{print substr($4, 2)}'"
+    },
+    "cpe": {
+        "app": "osticket",
+        "manufacturer": "enhancesoft"
+    }
+}

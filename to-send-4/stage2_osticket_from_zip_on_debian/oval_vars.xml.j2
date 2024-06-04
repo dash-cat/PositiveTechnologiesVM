@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<oval_variables xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oval="http://oval.mitre.org/XMLSchema/oval-common-5" xmlns:oval-var="http://oval.mitre.org/XMLSchema/oval-variables-5" xmlns="http://oval.mitre.org/XMLSchema/oval-variables-5">
+  <generator>
+    <oval:product_name>PT OVAL generator</oval:product_name>
+    <oval:schema_version>5.11</oval:schema_version>
+    <oval:timestamp>2024-05-07T12:25:10</oval:timestamp>
+  </generator>
+  <variables>
+    <variable id="oval:test:var:1" datatype="string" comment="soft name">
+      <value>{% if name %}{{ name }}{% endif %}</value>
+    </variable>
+    <variable id="oval:test:var:2" datatype="version" comment="soft version">
+      <value>{% if version %}{{ version }}{% endif %}</value>
+    </variable>
+  </variables>
+</oval_variables>

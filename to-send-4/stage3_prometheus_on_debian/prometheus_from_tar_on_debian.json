@@ -1,0 +1,11 @@
+{
+    "name": "prometheus",
+    "detect": {
+        "type": "shell",
+        "command": "/opt/prometheus-2.45.5.linux-amd64/prometheus --version | grep -oP 'version \\K\\d+\\.\\d+\\.\\d+'"
+    },
+    "cpe": {
+        "app": "prometheus",
+        "manufacturer": "prometheus"
+    }
+}

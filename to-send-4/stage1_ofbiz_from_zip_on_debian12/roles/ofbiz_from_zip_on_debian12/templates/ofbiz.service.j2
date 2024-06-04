@@ -1,0 +1,12 @@
+[Unit]
+Description=Apache OFBiz
+After=network.target
+
+[Service]
+User=root
+ExecStart=/opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/startofbiz.sh
+ExecStop=/opt/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}/stopofbiz.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

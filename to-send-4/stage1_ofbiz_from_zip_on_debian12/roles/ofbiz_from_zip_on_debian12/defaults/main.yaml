@@ -1,0 +1,13 @@
+---
+ofbiz_from_zip_on_debian12_version: "18.12.14"
+ofbiz_from_zip_on_debian12_java_opts: "-Xmx2048m"
+ofbiz_from_zip_on_debian12_user_home: "/opt/ofbiz"
+ofbiz_from_zip_on_debian12_user: ofbiz
+ofbiz_from_zip_on_debian12_user_group: ofbiz
+ofbiz_from_zip_on_debian12_user_shell: /bin/bash
+ofbiz_from_zip_on_debian12_user_uid: 454
+ofbiz_from_zip_on_debian12_user_gid: 454
+ofbiz_from_zip_on_debian12_proxy: ""
+ofbiz_from_zip_on_debian12_cache: true
+ofbiz_from_zip_on_debian12_dir: "{{ ofbiz_from_zip_on_debian12_user_home }}/ofbiz/{{ ofbiz_from_zip_on_debian12_version }}"
+ofbiz_from_zip_on_debian12_ex_dir: "{{ ofbiz_from_zip_on_debian12_dir }}/apache-ofbiz-{{ ofbiz_from_zip_on_debian12_version }}"

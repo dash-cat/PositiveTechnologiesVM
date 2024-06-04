@@ -1,0 +1,10 @@
+# ofbiz_from_zip_on_debian12/playbook.yaml
+- name: Install Apache OFBiz from ZIP on Debian 12
+  hosts: all
+  become: true
+  vars:
+    ofbiz_from_zip_on_debian12_version: "18.12.14"
+  roles:
+    - role: ofbiz_from_zip_on_debian12
+      tags:
+        - install
