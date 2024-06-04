@@ -1,6 +1,8 @@
 #!/bin/zsh
 
 SSH_HOST="localhost"
+# SSH_HOST="192.168.0.100"
+
 SSH_PORT=2222
 SSH_USER="ansible"
 

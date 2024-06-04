@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Change to the to-send-2 directory
-cd to-send-3
+cd to-send-4
 
 # Loop through each directory in to-send-2
 for dir in */; do

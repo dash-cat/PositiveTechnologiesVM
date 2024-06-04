@@ -1,5 +1,12 @@
 ## Searching for CPEs
 
+keycloack 2
+strongSwan 2
+Python3 2
+nginx unit 2
+
+TODO
+WireGuard 3
 
 sudo hwclock --hctosys 
 new_password
