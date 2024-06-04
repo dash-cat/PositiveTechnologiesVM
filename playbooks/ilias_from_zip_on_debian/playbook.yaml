@@ -9,7 +9,7 @@
     ilias_data_dir: "/var/www/files"
     ilias_docroot: "/var/www/html/ilias"
     ilias_version: "release_9"
-    mysql_root_password: "your_mysql_root_password"
+    mysql_root_password: "your_db_password"
 
   tasks:
     - name: Install ntpdate
@@ -123,29 +123,16 @@
         state: started
       when: not mysql_service_status.failed
 
-    - name: Drop existing ILIAS database if it exists
-      community.mysql.mysql_db:
-        name: ilias
-        state: absent
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
-
-    - name: Create MySQL database
-      community.mysql.mysql_db:
-        name: ilias
-        state: present
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
-
-    - name: Create MySQL user and grant privileges
-      community.mysql.mysql_user:
-        name: ilias
-        password: "{{ ilias_db_password }}"
-        priv: "ilias.*:ALL"
-        host: localhost
-        state: present
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
+    - name: Execute MySQL commands to manage database and user
+      shell: |
+        mysql -u root -p'{{ mysql_root_password }}' -e "
+        DROP DATABASE IF EXISTS ilias;
+        CREATE DATABASE ilias CHARACTER SET utf8 COLLATE utf8_general_ci;
+        DROP USER IF EXISTS 'ilias'@'localhost';
+        CREATE USER 'ilias'@'localhost' IDENTIFIED BY '{{ ilias_db_password }}';
+        GRANT LOCK TABLES ON *.* TO 'ilias'@'localhost';
+        GRANT ALL PRIVILEGES ON ilias.* TO 'ilias'@'localhost';
+        FLUSH PRIVILEGES;"
 
     - name: Download ILIAS zip archive
       ansible.builtin.get_url:
@@ -159,24 +146,36 @@
         owner: www-data
         group: www-data
 
-    - name: Unzip ILIAS archive
+    - name: Install acl package
+      apt:
+        name: acl
+        state: present
+        update_cache: yes
+
+    - name: Create temporary directory for ILIAS
+      ansible.builtin.file:
+        path: /tmp/ilias_install
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Unzip ILIAS archive to temporary directory
       ansible.builtin.shell:
-        cmd: "unzip /tmp/ILIAS-9.1.zip -d {{ ilias_docroot }}"
+        cmd: "unzip -o /tmp/ILIAS-9.1.zip -d /tmp/ilias_install"
       become: yes
       become_user: www-data
 
     - name: Move ILIAS files to the correct location
       ansible.builtin.shell:
-        cmd: "mv {{ ilias_docroot }}/ILIAS-9.1/* {{ ilias_docroot }}/"
+        cmd: "rsync -a --force --delete /tmp/ilias_install/ILIAS-9.1/ {{ ilias_docroot }}/"
       become: yes
-      become_user: www-data
+      become_user: root
 
-    - name: Remove top-level ILIAS directory
-      ansible.builtin.shell:
-        cmd: "rm -rf {{ ilias_docroot }}/ILIAS-9.1"
-      become: yes
-      become_user: www-data
-
+    - name: Remove temporary ILIAS directory
+      ansible.builtin.file:
+        path: /tmp/ilias_install
+        state: absent
 
     - name: Ensure www-data has ownership of the ILIAS directory
       ansible.builtin.file:
@@ -278,13 +277,13 @@
 
     - name: Configure Apache virtual host for ILIAS
       ansible.builtin.blockinfile:
-        path: /etc/apache2/sites-available/ilias.conf
+        path: /etc/apache2/sites-available/000-default.conf
         block: |
           <VirtualHost *:80>
               ServerAdmin {{ ilias_admin_email }}
               DocumentRoot {{ ilias_docroot }}
               <Directory {{ ilias_docroot }}>
-                  Options FollowSymLinks -Indexes
+                  Options +FollowSymLinks -Indexes
                   AllowOverride All
                   Require all granted
               </Directory>
@@ -294,7 +293,7 @@
           </VirtualHost>
 
     - name: Enable ILIAS site
-      ansible.builtin.command: a2ensite ilias.conf
+      ansible.builtin.command: /usr/sbin/a2ensite 000-default.conf
 
     - name: Restart Apache to apply new configuration
       ansible.builtin.service:

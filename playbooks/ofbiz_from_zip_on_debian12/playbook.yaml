@@ -3,7 +3,7 @@
   hosts: all
   become: true
   vars:
-    ofbiz_version: "18.12.06"
+    ofbiz_version: "18.12.14"
   roles:
     - role: ofbiz_from_zip_on_debian12
       tags: 
