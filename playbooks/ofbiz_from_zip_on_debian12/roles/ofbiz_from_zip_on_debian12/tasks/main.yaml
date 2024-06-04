@@ -1,8 +1,4 @@
 ---
-# Copyright (c) James Cherti
-# URL: https://github.com/jamescherti/ansible-role-ofbiz
-# Distributed under terms of the MIT license.
-
 - name: "Assertions"
   assert:
     that:
@@ -19,8 +15,12 @@
 
     - name: "Install OpenJDK GPG key"
       command: apt-key add /tmp/adoptopenjdk.asc
+    
+    - name: Install coreutils
+      apt:
+        name: coreutils
+        state: present
 
-    # configure PPA for OpenJDK uploads (restricted) team https://launchpad.net/~openjdk-r/+archive/ubuntu/ppa
     - name: "Configure Ubuntu OpenJDK Apt repository"
       apt_repository:
         repo: "deb http://ppa.launchpad.net/openjdk-r/ppa/ubuntu {{ ansible_distribution_release }} main"
@@ -160,26 +160,6 @@
         path: "{{ ofbiz_user_home }}/downloads/KEYS"
       register: _gpg_keys_file
 
-    # - name: "Download OFBiz developers GPG keys 'KEYS'"
-    #   get_url:
-    #     dest: "{{ ofbiz_user_home }}/downloads/KEYS"
-    #     url: https://downloads.apache.org/ofbiz/KEYS
-    #     owner: "{{ ofbiz_user }}"
-    #     group: "{{ ofbiz_user_group }}"
-    #     mode: 0644
-    #     checksum: "{{ _ofbiz_dev_gpg_keys_checksum }}"
-    #     use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
-    #   register: _ofbiz_dev_keys
-    #   when: not _gpg_keys_file.stat.exists
-
-    # - name: "Import OFBiz developers GPG keys"
-    #   command: gpg --import KEYS
-    #   args:
-    #     chdir: "{{ ofbiz_user_home }}/downloads"
-    #   become: true
-    #   become_user: "{{ ofbiz_user }}"
-    #   when: _ofbiz_dev_keys.changed
-
     - name: "Check the existence of {{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
       stat:
         path: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
@@ -194,34 +174,6 @@
         mode: 0644
         use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
       when: not _ofbiz_zip_archive_file.stat.exists
-
-    # - name: "Check the existence of {{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-    #   stat:
-    #     path: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-    #   register: _ofbiz_gpg_signature_file
-
-    # - name: "Download OFBiz GPG signature"
-    #   get_url:
-    #     dest: "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-    #     url: "https://downloads.apache.org/ofbiz/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-    #     owner: "{{ ofbiz_user }}"
-    #     group: "{{ ofbiz_user_group }}"
-    #     mode: 0644
-    #     use_proxy: "{{ 'yes' if ofbiz_proxy != '' else 'no' }}"
-    #   when: not _ofbiz_gpg_signature_file.stat.exists
-
-    # - name: "Check GPG signature of Apache OFBiz ZIP file"
-    #   command:
-    #     argv:
-    #       - "gpg"
-    #       - "--verify"
-    #       - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip.asc"
-    #       - "{{ ofbiz_user_home }}/downloads/apache-ofbiz-{{ ofbiz_version }}.zip"
-    #   args:
-    #     chdir: "{{ ofbiz_user_home }}/downloads"
-    #   become: true
-    #   become_user: "{{ ofbiz_user }}"
-    #   changed_when: false
 
     - name: "Extract OFBiz archive"
       block:
@@ -251,29 +203,6 @@
       become: true
       become_user: "{{ ofbiz_user }}"
 
-    - name: "cool"
-      copy:
-        dest: "{{ ofbiz_user_home }}/env.sh"
-        owner: "{{ ofbiz_user }}"
-        group: "{{ ofbiz_user_group }}"
-        mode: 0644
-        content: |
-          if [[ -d /usr/lib/jvm/java-8-openjdk/jre/bin ]]; then
-            # specific to Arch Linux
-            export PATH="/usr/lib/jvm/java-8-openjdk/jre/bin/:$PATH"
-          fi
-
-          {% if ofbiz_proxy != "" %}
-          export http_proxy="{{ ofbiz_proxy }}"
-          export https_proxy="{{ ofbiz_proxy }}"
-          export HTTPS_PROXY=""
-          export HTTP_PROXY=""
-          {% endif %}
-          export JAVA_OPTS="{{ ofbiz_java_opts }}"
-          {% if ansible_os_family == 'Archlinux' %}
-          export PATH=/usr/lib/jvm/java-8-openjdk/bin:$PATH
-          {% endif %}
-
     - name: "Link {{ ofbiz_user_home }}/current"
       file:
         state: link
@@ -281,9 +210,17 @@
         src: "{{ _ofbiz_extraction_dir }}"
         owner: "{{ ofbiz_user }}"
         group: "{{ ofbiz_user_group }}"
+  
+    - name: Set default Java version to Java 8
+      alternatives:
+        name: java
+        link: /usr/bin/java
+        path: /usr/lib/jvm/temurin-8-jdk-amd64/bin/java
+        priority: 1081
+      become: true
 
     - name: "Run: gradle/init-gradle-wrapper.sh"
-      command: ./gradle/init-gradle-wrapper.sh
+      shell: bash ./gradle/init-gradle-wrapper.sh
       args:
         chdir: "{{ _ofbiz_extraction_dir }}"
         creates: "{{ _ofbiz_extraction_dir }}/gradle/wrapper/gradle-wrapper.jar"
@@ -299,16 +236,6 @@
       loop:
         - 'source {{ ofbiz_user_home }}/env.sh'
         - '[[ `id -u` -eq 0 ]] && exit 1'
-    
-    # - name: Set JAVA_HOME and update PATH
-    #   become: yes
-    #   lineinfile:
-    #     path: /etc/environment
-    #     state: present
-    #     line: "{{ item }}"
-    #   with_items:
-    #     - 'JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64'
-    #     - 'PATH=$JAVA_HOME/bin:$PATH'
 
     - name: Create OFBiz Systemd service file
       become: yes
@@ -326,8 +253,8 @@
           ExecStartPre=/bin/bash -c 'echo $JAVA_HOME; $JAVA_HOME/bin/java -version'
           ExecStart=bash {{ _ofbiz_extraction_dir }}/gradlew ofbiz
           Restart=always
-          Environment="JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64"
-          Environment="PATH=/usr/lib/jvm/temurin-8-jdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          # Environment="JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64"
+          # Environment="PATH=/usr/lib/jvm/temurin-8-jdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
           [Install]
           WantedBy=multi-user.target
