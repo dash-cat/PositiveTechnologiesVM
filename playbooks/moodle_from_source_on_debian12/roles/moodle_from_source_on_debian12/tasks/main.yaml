@@ -1,0 +1,72 @@
+---
+- name: Ensure required packages are installed
+  ansible.builtin.apt:
+    name:
+      - apache2
+      - php
+      - php-mysql
+      - php-xml
+      - php-intl
+      - php-curl
+      - php-zip
+      - php-gd
+      - php-mbstring
+      - git
+      - unzip
+    state: present
+
+- name: Download Moodle
+  ansible.builtin.git:
+    repo: 'https://github.com/moodle/moodle.git'
+    version: "MOODLE_{{ moodle_from_source_on_debian12_version }}_STABLE"
+    dest: "{{ moodle_from_source_on_debian12_install_dir }}"
+    update: false
+
+- name: Set permissions for Moodle directory
+  ansible.builtin.file:
+    path: "{{ moodle_from_source_on_debian12_install_dir }}"
+    owner: www-data
+    group: www-data
+    recurse: true
+
+- name: Create Moodle data directory
+  ansible.builtin.file:
+    path: /var/moodledata
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0770'
+
+- name: Configure Apache for Moodle
+  ansible.builtin.copy:
+    dest: /etc/apache2/sites-available/moodle.conf
+    content: |
+      <VirtualHost *:80>
+          DocumentRoot {{ moodle_from_source_on_debian12_install_dir }}
+          <Directory {{ moodle_from_source_on_debian12_install_dir }}>
+              Options Indexes FollowSymLinks MultiViews
+              AllowOverride All
+              Require all granted
+          </Directory>
+      </VirtualHost>
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Apache
+
+- name: Enable Moodle site
+  ansible.builtin.command: a2ensite moodle.conf
+  changed_when: false
+
+- name: Disable default Apache site
+  ansible.builtin.command: a2dissite 000-default.conf
+  changed_when: false
+
+- name: Enable Apache rewrite module
+  ansible.builtin.command: a2enmod rewrite
+  changed_when: false
+
+- name: Restart Apache
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
