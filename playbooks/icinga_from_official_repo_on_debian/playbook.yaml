@@ -1,0 +1,7 @@
+- name: Install Icinga from official repo on Debian
+  hosts: all
+  become: true
+  roles:
+    - role: icinga_from_official_repo_on_debian
+      tags:
+        - install
