@@ -2,10 +2,8 @@
   hosts: all
   become: true
   vars:
-    gitea_version: "1.22.0"
+    gitea_from_binary_on_debian_version: "1.17.3"
   roles:
     - role: gitea_from_binary_on_debian
-      vars:
-        gitea_from_binary_on_debian_version: "{{ gitea_version }}"
       tags:
         - install
