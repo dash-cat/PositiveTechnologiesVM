@@ -1,0 +1,80 @@
+# roles/xwiki_from_zip_on_debian/tasks/main.yaml
+
+- name: Ensure installation directory exists
+  file:
+    path: "{{ xwiki_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+
+- name: Debug network connectivity
+  command: ping -c 4 google.com
+  register: ping_output
+  ignore_errors: true
+
+- debug:
+    var: ping_output
+
+- name: Debug DNS resolution
+  command: nslookup nexus.xwiki.org
+  register: nslookup_output
+  ignore_errors: true
+
+- debug:
+    var: nslookup_output
+
+- name: Download XWiki ZIP
+  get_url:
+    url: "{{ xwiki_download_url }}"
+    dest: /tmp/xwiki.zip
+  retries: 3
+  delay: 5
+  register: download_result
+  until: download_result is succeeded
+
+- name: Unzip XWiki
+  unarchive:
+    src: /tmp/xwiki.zip
+    dest: "{{ xwiki_install_dir }}"
+    remote_src: yes
+
+- name: Set execute permissions for start script
+  file:
+    path: "{{ xwiki_install_dir }}/xwiki-platform-distribution-flavor-jetty-hsqldb-{{ xwiki_version }}/start_xwiki.sh"
+    mode: '0755'
+  when: download_result is succeeded
+
+- name: Start XWiki
+  command: "{{ xwiki_install_dir }}/xwiki-platform-distribution-flavor-jetty-hsqldb-{{ xwiki_version }}/start_xwiki.sh"
+  async: 0
+  poll: 0
+  become: true
+
+- name: Enable XWiki on startup
+  copy:
+    dest: /etc/systemd/system/xwiki.service
+    content: |
+      [Unit]
+      Description=XWiki
+      After=network.target
+
+      [Service]
+      Type=simple
+      ExecStart={{ xwiki_install_dir }}/xwiki-platform-distribution-flavor-jetty-hsqldb-{{ xwiki_version }}/start_xwiki.sh
+      Restart=on-failure
+      User=root
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  become: true
+
+- name: Enable and start the XWiki service
+  systemd:
+    name: xwiki
+    enabled: true
+    state: started
+  become: true

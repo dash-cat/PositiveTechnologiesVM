@@ -1,0 +1,4 @@
+- name: restart xwiki
+  service:
+    name: xwiki
+    state: restarted
