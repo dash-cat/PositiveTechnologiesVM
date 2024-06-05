@@ -184,7 +184,6 @@
 - name: Set read and execute permissions for others in /opt/ofbiz/
   ansible.builtin.file:
     path: /opt/ofbiz/
-    recurse: yes
-    others: yes
-    mode: 'o+rx'
+    recurse: true
+    mode: '0755'
   become: true

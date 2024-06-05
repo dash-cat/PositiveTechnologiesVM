@@ -181,6 +181,24 @@
       become: true
       become_user: www-data
 
+    - name: Ensure ILIAS directory exists
+      ansible.builtin.file:
+        path: "/tmp/ilias_install/ILIAS-9.1"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      become: true
+
+    - name: Ensure target directory exists
+      ansible.builtin.file:
+        path: "{{ ilias_docroot }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      become: true
+
     - name: Move ILIAS files to the correct location
       ansible.posix.synchronize:
         src: /tmp/ilias_install/ILIAS-9.1/
@@ -294,11 +312,11 @@
               }
           }
 
-    - name: Copy modified SQL dump file
-      ansible.builtin.copy:
-        src: ilias3_modified.sql
-        dest: /var/www/html/ilias/setup/sql/ilias3_modified.sql
-        mode: '0644'
+    # - name: Copy modified SQL dump file
+    #   ansible.builtin.copy:
+    #     src: ilias3_modified.sql
+    #     dest: /var/www/html/ilias/setup/sql/ilias3_modified.sql
+    #     mode: '0644'
 
     - name: Run ILIAS setup
       ansible.builtin.shell: |
