@@ -1,3 +1,3 @@
 ---
-moodle_from_source_on_debian12_version: "4.2"
+moodle_from_source_on_debian12_version: "4.4.0"
 moodle_from_source_on_debian12_install_dir: "/var/www/html/moodle"

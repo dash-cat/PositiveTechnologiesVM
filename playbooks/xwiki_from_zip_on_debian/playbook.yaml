@@ -1,12 +1,7 @@
-# playbook.yaml
 - name: Install XWiki from ZIP on Debian 12
   hosts: all
   become: true
-  vars:
-    xwiki_version: "16.4.0"
   roles:
     - role: xwiki_from_zip_on_debian
-      vars:
-        xwiki_from_zip_on_debian_version: "{{ xwiki_version }}"
       tags:
         - install
