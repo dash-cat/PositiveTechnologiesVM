@@ -1,0 +1,7 @@
+- name: Install Moodle from source on Debian 12
+  hosts: all
+  become: true
+  roles:
+    - role: moodle_from_source_on_debian12
+      tags:
+        - install

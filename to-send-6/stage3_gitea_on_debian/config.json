@@ -1,0 +1,11 @@
+{
+    "name": "gitea",
+    "detect": {
+        "type": "shell",
+        "command": "/usr/local/bin/gitea --version | grep -Po '\\d+\\.\\d+\\.\\d+' | head -n 1"
+    },
+    "cpe": {
+        "app": "gitea",
+        "manufacturer": "gitea"
+    }
+}

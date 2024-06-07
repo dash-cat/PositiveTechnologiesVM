@@ -1,0 +1,14 @@
+---
+- name: Install Nexus from TAR on Debian 12
+  hosts: all
+  become: true
+  vars:
+    nexus_version: "3.69.0-02"
+    nexus_java_version: "java11"  # Specify the Java version
+  roles:
+    - role: nexus_from_tar_on_debian12
+      vars:
+        nexus_from_tar_on_debian12_version: "{{ nexus_version }}"
+        nexus_from_tar_on_debian12_java_version: "{{ nexus_java_version }}"
+      tags:
+        - install
