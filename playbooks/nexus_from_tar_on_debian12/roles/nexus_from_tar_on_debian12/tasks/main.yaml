@@ -1,4 +1,32 @@
 ---
+- name: Install required packages for adding repository
+  ansible.builtin.apt:
+    name: 
+      - gnupg
+      - software-properties-common
+      - wget
+    state: present
+
+- name: Download Azul Zulu GPG key
+  ansible.builtin.command:
+    cmd: wget -qO - https://repos.azul.com/azul-repo.key | sudo apt-key add -
+  args:
+    _uses_shell: true
+
+- name: Add Azul Zulu repository
+  ansible.builtin.apt_repository:
+    repo: 'deb http://repos.azul.com/zulu/deb/ stable main'
+    state: present
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Ensure Java is installed
+  ansible.builtin.apt:
+    name: zulu-11
+    state: present
+
 - name: Create Nexus installation directory
   ansible.builtin.file:
     path: "{{ nexus_from_tar_on_debian12_install_dir }}"
@@ -15,7 +43,7 @@
   ansible.builtin.unarchive:
     src: "/tmp/nexus-{{ nexus_from_tar_on_debian12_version }}-{{ nexus_from_tar_on_debian12_java_version }}-unix.tar.gz"
     dest: "{{ nexus_from_tar_on_debian12_install_dir }}"
-    remote_src: true
+    remote_src: yes
 
 - name: Create nexus user
   ansible.builtin.user:
@@ -29,7 +57,17 @@
     state: directory
     owner: nexus
     group: nexus
-    recurse: true
+    recurse: yes
+
+- name: Configure Nexus environment variables
+  ansible.builtin.copy:
+    dest: "{{ nexus_from_tar_on_debian12_install_dir }}/nexus-{{ nexus_from_tar_on_debian12_version }}/bin/nexus.rc"
+    content: |
+      INSTALL4J_JAVA_HOME=/usr/lib/jvm/zulu-11-amd64
+      JAVA_HOME=/usr/lib/jvm/zulu-11-amd64
+    owner: nexus
+    group: nexus
+    mode: '0644'
 
 - name: Create Nexus service file
   ansible.builtin.copy:
@@ -42,6 +80,7 @@
       [Service]
       Type=forking
       LimitNOFILE=65536
+      EnvironmentFile={{ nexus_from_tar_on_debian12_install_dir }}/nexus-{{ nexus_from_tar_on_debian12_version }}/bin/nexus.rc
       ExecStart={{ nexus_from_tar_on_debian12_install_dir }}/nexus-{{ nexus_from_tar_on_debian12_version }}/bin/nexus start
       ExecStop={{ nexus_from_tar_on_debian12_install_dir }}/nexus-{{ nexus_from_tar_on_debian12_version }}/bin/nexus stop
       User=nexus
