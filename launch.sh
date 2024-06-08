@@ -40,7 +40,7 @@ ${HOST_IP} ansible_user=${ANSIBLE_USER} ansible_password=${ANSIBLE_PASSWORD} ans
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
 EOL
-
+# --start-at-task "Generate Moodle config.php"
 # Запуск Ansible playbook
 
 ANSIBLE_SUDO_PASS=${ANSIBLE_PASSWORD} ansible-playbook -i inventory.ini ${PLAYBOOK_PATH} -vvv
