@@ -1,5 +1,3 @@
-# roles/xwiki_from_zip_on_debian/tasks/main.yaml
-
 - name: Ensure installation directory exists
   ansible.builtin.file:
     path: "{{ xwiki_from_zip_on_debian_install_dir }}"
@@ -7,6 +5,12 @@
     owner: root
     group: root
     mode: '0755'
+
+- name: Install unzip utility
+  ansible.builtin.package:
+    name: unzip
+    state: present
+  become: true
 
 - name: Debug network connectivity
   ansible.builtin.command:

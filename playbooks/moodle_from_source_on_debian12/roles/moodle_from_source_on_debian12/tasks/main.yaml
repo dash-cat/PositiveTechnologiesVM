@@ -1,72 +1,155 @@
 ---
 - name: Ensure required packages are installed
   ansible.builtin.apt:
-    name:
+    name: 
+      - lsb-release
+      - ca-certificates
+      - curl
+      - wget
       - apache2
-      - php
+      - php8.2
+      - php8.2-mysql
+      - libapache2-mod-php8.2
+      - php8.2-gd
+      - php8.2-curl
+      - php8.2-xmlrpc
+      - php8.2-xml
+      - php8.2-soap
+      - php8.2-intl
+      - php8.2-zip
+      - php8.2-mbstring
       - php-mysql
-      - php-xml
-      - php-intl
-      - php-curl
-      - php-zip
-      - php-gd
-      - php-mbstring
-      - git
-      - unzip
+      - mariadb-server
     state: present
+    update_cache: yes
+  become: true
 
-- name: Download Moodle
-  ansible.builtin.git:
-    repo: 'https://github.com/moodle/moodle.git'
-    version: "MOODLE_{{ moodle_from_source_on_debian12_version }}_STABLE"
-    dest: "{{ moodle_from_source_on_debian12_install_dir }}"
-    update: false
+- name: Start and enable Apache
+  service:
+    name: apache2
+    state: started
+    enabled: true
 
-- name: Set permissions for Moodle directory
+- name: Ensure MariaDB server is installed
+  ansible.builtin.apt:
+    name: mariadb-server
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Ensure MySQL Python package is installed
+  ansible.builtin.apt:
+    name: python3-pymysql
+    state: present
+  become: true
+
+- name: Set MySQL root password and authentication plugin
+  ansible.builtin.command: >
+    mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root_password';"
+  args:
+    creates: /var/log/mysql/root_password_set
+  register: root_password_result
+  become: true
+  ignore_errors: true
+
+- name: Create a file to indicate root password has been set
   ansible.builtin.file:
-    path: "{{ moodle_from_source_on_debian12_install_dir }}"
-    owner: www-data
-    group: www-data
-    recurse: true
+    path: /var/log/mysql/root_password_set
+    state: touch
+  when: root_password_result.changed
+  become: true
+
+- name: Create Moodle database
+  community.mysql.mysql_db:
+    name: moodle
+    state: present
+    login_user: root
+    login_password: root_password
+  become: true
+
+- name: Create MySQL user for Moodle
+  community.mysql.mysql_user:
+    name: moodleuser
+    password: moodlepassword
+    priv: "moodle.*:ALL"
+    state: present
+    login_user: root
+    login_password: root_password
+  become: true
 
 - name: Create Moodle data directory
-  ansible.builtin.file:
-    path: /var/moodledata
+  file:
+    path: "{{ moodle_data }}"
     state: directory
     owner: www-data
     group: www-data
-    mode: '0770'
+    mode: '0777'
+
+- name: Download and extract Moodle
+  unarchive:
+    src: https://download.moodle.org/download.php/stable402/moodle-latest-402.tgz
+    dest: /var/www/html/
+    remote_src: yes
+    owner: www-data
+    group: www-data
+
+- name: Set permissions for Moodle directory
+  file:
+    path: "{{ moodle_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: yes
 
 - name: Configure Apache for Moodle
-  ansible.builtin.copy:
+  copy:
     dest: /etc/apache2/sites-available/moodle.conf
     content: |
       <VirtualHost *:80>
-          DocumentRoot {{ moodle_from_source_on_debian12_install_dir }}
-          <Directory {{ moodle_from_source_on_debian12_install_dir }}>
+          DocumentRoot {{ moodle_dir }}
+          <Directory {{ moodle_dir }}>
               Options Indexes FollowSymLinks MultiViews
               AllowOverride All
               Require all granted
           </Directory>
       </VirtualHost>
-    owner: root
-    group: root
-    mode: '0644'
-  notify: Restart Apache
+  notify:
+    - Restart Apache
 
-- name: Enable Moodle site
-  ansible.builtin.command: a2ensite moodle.conf
-  changed_when: false
-
-- name: Disable default Apache site
-  ansible.builtin.command: a2dissite 000-default.conf
-  changed_when: false
-
-- name: Enable Apache rewrite module
-  ansible.builtin.command: a2enmod rewrite
+- name: Enable Moodle site and modules
+  command: "{{ item }}"
+  loop:
+    - a2ensite moodle.conf
+    - a2enmod rewrite
   changed_when: false
 
 - name: Restart Apache
-  ansible.builtin.service:
+  service:
     name: apache2
     state: restarted
+
+- name: Generate Moodle config.php
+  command: >
+    sudo -u www-data php {{ moodle_dir }}/admin/cli/install.php
+    --chmod=2777
+    --lang=en
+    --wwwroot={{ moodle_url }}
+    --dataroot={{ moodle_data }}
+    --dbtype=mariadb
+    --dbname={{ db_name }}
+    --dbuser={{ db_user }}
+    --dbpass={{ db_pass }}
+    --fullname="MoodleSite"
+    --shortname=moodle
+    --adminuser={{ admin_user }}
+    --adminpass={{ admin_pass }}
+    --adminemail={{ admin_email }}
+    --agree-license
+    --non-interactive
+
+- name: Set up cron job for Moodle
+  cron:
+    name: "Moodle cron"
+    user: www-data
+    minute: "*"
+    job: "/usr/bin/php {{ moodle_dir }}/admin/cli/cron.php >/dev/null"
