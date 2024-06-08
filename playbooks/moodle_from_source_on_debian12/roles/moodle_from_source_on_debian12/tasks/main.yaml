@@ -43,21 +43,20 @@
     state: present
   become: true
 
-- name: Set MySQL root password and authentication plugin
-  ansible.builtin.command: >
-    mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root_password';"
-  args:
-    creates: /var/log/mysql/root_password_set
+- name: Ensure MySQL root password is set
+  ansible.builtin.mysql_user:
+    name: root
+    host: localhost
+    password: root_password
+    state: present
+    check_implicit_admin: yes
   register: root_password_result
   become: true
   ignore_errors: true
 
-- name: Create a file to indicate root password has been set
-  ansible.builtin.file:
-    path: /var/log/mysql/root_password_set
-    state: touch
-  when: root_password_result.changed
-  become: true
+- name: Debug root password result
+  debug:
+    var: root_password_result
 
 - name: Create Moodle database
   community.mysql.mysql_db:
@@ -85,9 +84,15 @@
     group: www-data
     mode: '0777'
 
-- name: Download and extract Moodle
-  unarchive:
-    src: https://download.moodle.org/download.php/stable402/moodle-latest-402.tgz
+- name: Download Moodle
+  ansible.builtin.get_url:
+    url: https://download.moodle.org/download.php/direct/stable404/moodle-latest-404.tgz
+    dest: /tmp/moodle-latest-404.tgz
+    mode: '0644'
+
+- name: Extract Moodle
+  ansible.builtin.unarchive:
+    src: /tmp/moodle-latest-404.tgz
     dest: /var/www/html/
     remote_src: yes
     owner: www-data
@@ -128,9 +133,14 @@
     name: apache2
     state: restarted
 
+- name: Check if config.php exists
+  stat:
+    path: "{{ moodle_dir }}/config.php"
+  register: moodle_config
+
 - name: Generate Moodle config.php
   command: >
-    sudo -u www-data php {{ moodle_dir }}/admin/cli/install.php
+    php {{ moodle_dir }}/admin/cli/install.php
     --chmod=2777
     --lang=en
     --wwwroot={{ moodle_url }}
@@ -146,6 +156,11 @@
     --adminemail={{ admin_email }}
     --agree-license
     --non-interactive
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: www-data
+  when: not moodle_config.stat.exists
 
 - name: Set up cron job for Moodle
   cron:
