@@ -1,4 +1,14 @@
 ---
+- name: Ensure ntpdate is installed
+  apt:
+    name: ntpdate
+    state: present
+  become: true
+
+- name: Synchronize system clock
+  command: ntpdate pool.ntp.org
+  become: true
+
 - name: Ensure required packages are installed
   ansible.builtin.apt:
     name: 
@@ -24,6 +34,12 @@
     update_cache: yes
   become: true
 
+- name: Install acl package
+  become: true
+  ansible.builtin.apt:
+    name: acl
+    state: present
+
 - name: Start and enable Apache
   service:
     name: apache2
@@ -43,38 +59,59 @@
     state: present
   become: true
 
-- name: Ensure MySQL root password is set
-  ansible.builtin.mysql_user:
+- name: Ensure .my.cnf exists for root user
+  ansible.builtin.file:
+    path: /root/.my.cnf
+    state: touch
+    mode: '0600'
+
+- name: Add MySQL root credentials to .my.cnf
+  ansible.builtin.lineinfile:
+    path: /root/.my.cnf
+    create: true
+    line: "{{ item }}"
+    mode: '0600'
+  with_items:
+    - "[client]"
+    - "user=root"
+    - "password=root_password"
+
+- name: Set MySQL root password
+  community.mysql.mysql_user:
     name: root
     host: localhost
-    password: root_password
-    state: present
-    check_implicit_admin: yes
-  register: root_password_result
-  become: true
-  ignore_errors: true
+    password: "root_password"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    check_implicit_admin: true
+    priv: "*.*:ALL,GRANT"
 
-- name: Debug root password result
-  debug:
-    var: root_password_result
+- name: Ensure MySQL service is started
+  ansible.builtin.service:
+    name: mariadb
+    state: started
+  register: mysql_service_status
 
-- name: Create Moodle database
-  community.mysql.mysql_db:
-    name: moodle
-    state: present
-    login_user: root
-    login_password: root_password
-  become: true
+- name: Wait for MySQL to be available
+  ansible.builtin.wait_for:
+    port: 3306
+    host: localhost
+    delay: 10
+    state: started
+  when: not mysql_service_status.failed
 
-- name: Create MySQL user for Moodle
-  community.mysql.mysql_user:
-    name: moodleuser
-    password: moodlepassword
-    priv: "moodle.*:ALL"
-    state: present
-    login_user: root
-    login_password: root_password
-  become: true
+- name: Execute MySQL commands to manage database and user
+  ansible.builtin.shell: |
+    mysql -u root -p'root_password' -e "
+    DROP DATABASE IF EXISTS moodle;
+    CREATE DATABASE moodle CHARACTER SET utf8 COLLATE utf8_general_ci;
+    DROP USER IF EXISTS 'moodleuser'@'localhost';
+    CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY 'root_password';
+    GRANT LOCK TABLES ON *.* TO 'moodleuser'@'localhost';
+    GRANT ALL PRIVILEGES ON moodle.* TO 'moodleuser'@'localhost';
+    FLUSH PRIVILEGES;"
+  register: mysql_commands
+  changed_when:
+    - '"Database changed" in mysql_commands.stdout'
 
 - name: Create Moodle data directory
   file:
@@ -138,29 +175,40 @@
     path: "{{ moodle_dir }}/config.php"
   register: moodle_config
 
+- name: Find PHP configuration file
+  ansible.builtin.shell: "php --ini | grep 'Loaded Configuration File:'"
+  register: php_ini_output
+
+- name: Update PHP configuration for max_input_vars
+  become: true
+  ansible.builtin.lineinfile:
+    path: "{{ php_ini_output.stdout_lines[0].split(': ')[1] | trim }}"
+    regexp: '^max_input_vars'
+    line: 'max_input_vars = 5000'
+    state: present
+  when: php_ini_output.stdout_lines is defined
+
+- name: Restart Apache
+  become: true
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
+
+- name: Remove existing Moodle config.php
+  become: true
+  ansible.builtin.file:
+    path: /var/www/html/moodle/config.php
+    state: absent
+
 - name: Generate Moodle config.php
-  command: >
-    php {{ moodle_dir }}/admin/cli/install.php
-    --chmod=2777
-    --lang=en
-    --wwwroot={{ moodle_url }}
-    --dataroot={{ moodle_data }}
-    --dbtype=mariadb
-    --dbname={{ db_name }}
-    --dbuser={{ db_user }}
-    --dbpass={{ db_pass }}
-    --fullname="MoodleSite"
-    --shortname=moodle
-    --adminuser={{ admin_user }}
-    --adminpass={{ admin_pass }}
-    --adminemail={{ admin_email }}
-    --agree-license
-    --non-interactive
-  args:
-    executable: /bin/bash
   become: true
   become_user: www-data
-  when: not moodle_config.stat.exists
+  ansible.builtin.shell: |
+    sudo php /var/www/html/moodle/admin/cli/install.php --chmod=2777 --lang=en --wwwroot=http://localhost --dataroot=/var/moodledata --dbtype=mariadb --dbname=moodle --dbuser=moodleuser --dbpass=root_password --fullname=MoodleSite --shortname=moodle --adminuser=admin --adminpass=AdminPassword123! --adminemail=admin@example.com --agree-license --non-interactive
+  args:
+    creates: /var/www/html/moodle/config.php
+  environment:
+    PATH: "/usr/bin:/usr/local/bin:/bin"
 
 - name: Set up cron job for Moodle
   cron:
