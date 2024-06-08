@@ -1,6 +1,5 @@
 #!/bin/bash
-
-cd to-send-6
+cd to-send-7/stage-three
 
 # Loop through each directory in to-send-2
 for dir in */; do

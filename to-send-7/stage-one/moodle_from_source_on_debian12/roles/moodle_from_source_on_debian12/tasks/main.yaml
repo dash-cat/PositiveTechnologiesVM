@@ -1,0 +1,218 @@
+---
+- name: Ensure ntpdate is installed
+  apt:
+    name: ntpdate
+    state: present
+  become: true
+
+- name: Synchronize system clock
+  command: ntpdate pool.ntp.org
+  become: true
+
+- name: Ensure required packages are installed
+  ansible.builtin.apt:
+    name: 
+      - lsb-release
+      - ca-certificates
+      - curl
+      - wget
+      - apache2
+      - php8.2
+      - php8.2-mysql
+      - libapache2-mod-php8.2
+      - php8.2-gd
+      - php8.2-curl
+      - php8.2-xmlrpc
+      - php8.2-xml
+      - php8.2-soap
+      - php8.2-intl
+      - php8.2-zip
+      - php8.2-mbstring
+      - php-mysql
+      - mariadb-server
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Install acl package
+  become: true
+  ansible.builtin.apt:
+    name: acl
+    state: present
+
+- name: Start and enable Apache
+  service:
+    name: apache2
+    state: started
+    enabled: true
+
+- name: Ensure MariaDB server is installed
+  ansible.builtin.apt:
+    name: mariadb-server
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Ensure MySQL Python package is installed
+  ansible.builtin.apt:
+    name: python3-pymysql
+    state: present
+  become: true
+
+- name: Ensure .my.cnf exists for root user
+  ansible.builtin.file:
+    path: /root/.my.cnf
+    state: touch
+    mode: '0600'
+
+- name: Add MySQL root credentials to .my.cnf
+  ansible.builtin.lineinfile:
+    path: /root/.my.cnf
+    create: true
+    line: "{{ item }}"
+    mode: '0600'
+  with_items:
+    - "[client]"
+    - "user=root"
+    - "password=root_password"
+
+- name: Set MySQL root password
+  community.mysql.mysql_user:
+    name: root
+    host: localhost
+    password: "root_password"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    check_implicit_admin: true
+    priv: "*.*:ALL,GRANT"
+
+- name: Ensure MySQL service is started
+  ansible.builtin.service:
+    name: mariadb
+    state: started
+  register: mysql_service_status
+
+- name: Wait for MySQL to be available
+  ansible.builtin.wait_for:
+    port: 3306
+    host: localhost
+    delay: 10
+    state: started
+  when: not mysql_service_status.failed
+
+- name: Execute MySQL commands to manage database and user
+  ansible.builtin.shell: |
+    mysql -u root -p'root_password' -e "
+    DROP DATABASE IF EXISTS moodle;
+    CREATE DATABASE moodle CHARACTER SET utf8 COLLATE utf8_general_ci;
+    DROP USER IF EXISTS 'moodleuser'@'localhost';
+    CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY 'root_password';
+    GRANT LOCK TABLES ON *.* TO 'moodleuser'@'localhost';
+    GRANT ALL PRIVILEGES ON moodle.* TO 'moodleuser'@'localhost';
+    FLUSH PRIVILEGES;"
+  register: mysql_commands
+  changed_when:
+    - '"Database changed" in mysql_commands.stdout'
+
+- name: Create Moodle data directory
+  file:
+    path: "{{ moodle_data }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0777'
+
+- name: Download Moodle
+  ansible.builtin.get_url:
+    url: https://download.moodle.org/download.php/direct/stable404/moodle-latest-404.tgz
+    dest: /tmp/moodle-latest-404.tgz
+    mode: '0644'
+
+- name: Extract Moodle
+  ansible.builtin.unarchive:
+    src: /tmp/moodle-latest-404.tgz
+    dest: /var/www/html/
+    remote_src: yes
+    owner: www-data
+    group: www-data
+
+- name: Set permissions for Moodle directory
+  file:
+    path: "{{ moodle_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: yes
+
+- name: Configure Apache for Moodle
+  copy:
+    dest: /etc/apache2/sites-available/moodle.conf
+    content: |
+      <VirtualHost *:80>
+          DocumentRoot {{ moodle_dir }}
+          <Directory {{ moodle_dir }}>
+              Options Indexes FollowSymLinks MultiViews
+              AllowOverride All
+              Require all granted
+          </Directory>
+      </VirtualHost>
+  notify:
+    - Restart Apache
+
+- name: Enable Moodle site and modules
+  command: "{{ item }}"
+  loop:
+    - a2ensite moodle.conf
+    - a2enmod rewrite
+  changed_when: false
+
+- name: Restart Apache
+  service:
+    name: apache2
+    state: restarted
+
+- name: Check if config.php exists
+  stat:
+    path: "{{ moodle_dir }}/config.php"
+  register: moodle_config
+
+- name: Find PHP configuration file
+  ansible.builtin.shell: "php --ini | grep 'Loaded Configuration File:'"
+  register: php_ini_output
+
+- name: Update PHP configuration for max_input_vars
+  become: true
+  ansible.builtin.lineinfile:
+    path: "{{ php_ini_output.stdout_lines[0].split(': ')[1] | trim }}"
+    regexp: '^max_input_vars'
+    line: 'max_input_vars = 5000'
+    state: present
+  when: php_ini_output.stdout_lines is defined
+
+- name: Restart Apache
+  become: true
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
+
+- name: Remove existing Moodle config.php
+  become: true
+  ansible.builtin.file:
+    path: /var/www/html/moodle/config.php
+    state: absent
+
+- name: Generate Moodle config.php
+  become: true
+  become_user: www-data
+  ansible.builtin.shell: |
+    sudo php /var/www/html/moodle/admin/cli/install.php --chmod=2777 --lang=en --wwwroot=http://localhost --dataroot=/var/moodledata --dbtype=mariadb --dbname=moodle --dbuser=moodleuser --dbpass=root_password --fullname=MoodleSite --shortname=moodle --adminuser=admin --adminpass=AdminPassword123! --adminemail=admin@example.com --agree-license --non-interactive
+  args:
+    creates: /var/www/html/moodle/config.php
+  environment:
+    PATH: "/usr/bin:/usr/local/bin:/bin"
+
+- name: Set up cron job for Moodle
+  cron:
+    name: "Moodle cron"
+    user: www-data
+    minute: "*"
+    job: "/usr/bin/php {{ moodle_dir }}/admin/cli/cron.php >/dev/null"

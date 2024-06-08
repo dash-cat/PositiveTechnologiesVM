@@ -1,0 +1,17 @@
+- name: Install Moodle from source on Debian 12
+  hosts: all
+  become: true
+  roles:
+    - role: moodle_from_source_on_debian12
+      vars:
+        db_name: moodle
+        db_user: moodleuser
+        db_pass: yourpassword
+        moodle_dir: /var/www/html/moodle
+        moodle_data: /var/moodledata
+        moodle_url: http://localhost
+        admin_user: admin
+        admin_pass: AdminPassword123!
+        admin_email: admin@example.com
+      tags:
+        - install

@@ -1,6 +1,11 @@
+- name: Ensure gnupg is installed
+  ansible.builtin.apt:
+    name: gnupg
+    state: present
+
 - name: Add Icinga GPG key
   ansible.builtin.apt_key:
-    url: 'https://packages.icinga.com/icinga.key'
+    url: "https://packages.icinga.com/icinga.key"
     state: present
 
 - name: Add Icinga repository
