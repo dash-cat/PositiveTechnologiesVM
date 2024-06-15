@@ -1,0 +1,12 @@
+[Unit]
+Description=XWiki
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ xwiki_from_zip_on_debian_install_dir }}/xwiki-platform-distribution-flavor-jetty-hsqldb-{{ xwiki_from_zip_on_debian_version }}/start_xwiki.sh
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

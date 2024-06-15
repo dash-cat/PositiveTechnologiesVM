@@ -4,7 +4,7 @@
   become: true
   vars:
     nexus_version: "3.69.0-02"
-    nexus_java_version: "java11"  # Specify the Java version
+    nexus_java_version: "java11"
   roles:
     - role: nexus_from_tar_on_debian12
       vars:
