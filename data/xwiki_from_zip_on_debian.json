@@ -6,6 +6,6 @@
     },
     "cpe": {
         "app": "xwiki",
-        "manufacturer": "xwiki"
+        "manufacturer": ["xwiki"]
     }
 }
