@@ -6,6 +6,6 @@
     },
     "cpe": {
         "app": "prometheus",
-        "manufacturer": "prometheus"
+        "manufacturer": ["prometheus"]
     }
 }
