@@ -1,5 +1,5 @@
 #!/bin/bash
-cd to-send-8
+cd to-send-9
 
 # Loop through each directory in to-send-2
 for dir in */; do
