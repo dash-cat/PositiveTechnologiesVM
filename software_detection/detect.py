@@ -21,22 +21,18 @@ version_res = [r'([\d.]+)-.+', r'([\d.]+)']
 oval_vars_template_file = 'oval_vars.xml.j2'
 oval_vars_file = 'oval_vars.xml'
 
-# Main function to execute the script
 if __name__ == '__main__':
-    # Extract version using multiple regexes
     context = {
         'name': None,
         'version': None
     }
 
-    # Check for the "detect" property in the configuration
     if 'detect' in config:
         detect_command = config['detect'].get('command')
         if detect_command:
             stream = os.popen(detect_command)
             command_output = stream.read()
 
-            # Extracting name and version from the command output
             for version_re in version_res:
                 result = re.search(version_re, command_output)
                 if result:
