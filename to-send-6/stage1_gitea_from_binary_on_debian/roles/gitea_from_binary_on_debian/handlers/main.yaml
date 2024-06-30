@@ -1,5 +1,0 @@
----
-- name: Restart Gitea
-  ansible.builtin.systemd:
-    name: gitea.service
-    state: restarted

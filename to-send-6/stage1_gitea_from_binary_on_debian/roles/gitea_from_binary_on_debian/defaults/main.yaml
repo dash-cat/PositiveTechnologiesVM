@@ -1,8 +1,0 @@
----
-gitea_from_binary_on_debian_version: "1.17.3"
-gitea_from_binary_on_debian_download_url: >
-  https://dl.gitea.com/gitea/{{ gitea_from_binary_on_debian_version }}/gitea-{{ gitea_from_binary_on_debian_version }}-linux-amd64
-gitea_from_binary_on_debian_install_dir: "/usr/local/bin"
-gitea_from_binary_on_debian_user: "gitea"
-gitea_from_binary_on_debian_group: "gitea"
-gitea_from_binary_on_debian_service: "gitea.service"

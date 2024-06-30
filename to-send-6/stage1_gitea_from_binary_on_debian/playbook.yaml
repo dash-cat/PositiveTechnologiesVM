@@ -1,7 +1,0 @@
-- name: Install Gitea from binary on Debian
-  hosts: all
-  become: true
-  roles:
-    - role: gitea_from_binary_on_debian
-      tags:
-        - install

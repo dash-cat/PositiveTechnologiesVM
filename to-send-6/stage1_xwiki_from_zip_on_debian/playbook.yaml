@@ -1,7 +1,0 @@
-- name: Install XWiki from ZIP on Debian 12
-  hosts: all
-  become: true
-  roles:
-    - role: xwiki_from_zip_on_debian
-      tags:
-        - install

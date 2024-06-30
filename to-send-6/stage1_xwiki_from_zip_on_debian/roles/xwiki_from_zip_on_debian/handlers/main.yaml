@@ -1,4 +1,0 @@
-- name: Restart XWiki
-  ansible.builtin.service:
-    name: xwiki
-    state: restarted

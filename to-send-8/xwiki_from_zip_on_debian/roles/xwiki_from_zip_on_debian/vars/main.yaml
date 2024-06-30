@@ -1,5 +1,0 @@
-xwiki_from_zip_on_debian_version: "16.4.0"
-xwiki_from_zip_on_debian_url_base: "https://nexus.xwiki.org/nexus/content/groups/public/org/xwiki/platform/"
-xwiki_from_zip_on_debian_url_path: "xwiki-platform-distribution-flavor-jetty-hsqldb/{{ xwiki_from_zip_on_debian_version }}/"
-xwiki_from_zip_on_debian_url_file: "xwiki-platform-distribution-flavor-jetty-hsqldb-{{ xwiki_from_zip_on_debian_version }}.zip"
-xwiki_from_zip_on_debian_install_dir: "/opt/xwiki"
