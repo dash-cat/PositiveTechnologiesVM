@@ -376,4 +376,4 @@ fatal: [127.0.0.1]: FAILED! => {
         "Create directory '/var/www/html/ilias/data/myilias/mobs'...                [OK]",
         "Create directory '/var/www/html/ilias/data/myilias/usr_images'...          [OK]"
     ]
-}
+}# PositiveTechnologiesVM
