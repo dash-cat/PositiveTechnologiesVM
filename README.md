@@ -1,5 +1,5 @@
 ### онлайн-хакатон по MaxPatrol VM
-
+Занято первое место, с колосальным отрывом от остальных участников.
 # configuration files
 /config
 # stage 1 VM
