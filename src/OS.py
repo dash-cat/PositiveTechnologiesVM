@@ -1,4 +1,5 @@
 import platform
+from typing import Callable
 import distro
 from dataclasses import dataclass
 from packages import (
@@ -15,7 +16,7 @@ from packages import (
 @dataclass
 class OS:
     family: str
-    get_packages: callable[[], list[str]]
+    get_packages: Callable[[], list[str]]
 
 
 # Define OS configurations for each supported type

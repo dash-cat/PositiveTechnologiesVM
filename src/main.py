@@ -6,4 +6,7 @@ from packages import get_cross_platform_packages
 
 
 if __name__ == "__main__":
-    print("\n".join(get_system().get_packages().extend(get_cross_platform_packages())))
+    pkgs = get_system().get_packages()
+    pkgs.extend(get_cross_platform_packages())
+    for pkg in pkgs:
+        print(pkg)

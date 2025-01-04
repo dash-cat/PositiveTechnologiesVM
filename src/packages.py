@@ -2,139 +2,120 @@ import os
 import subprocess
 import sys
 
-from typing import TypedDict
-import winreg
+from typing import Callable, List, TypedDict
 
 class Package(TypedDict):
     name: str
     version: str
     source: str
 
-def get_linux_debian_packages() -> list[Package]:
+def get_packages_generic(
+    command: list[str],
+    source: str,
+    stdout_mapper: Callable[[list[str]], list[str]],
+    get_name: Callable[[str], str],
+    get_version: Callable[[str], str],
+) -> list[Package]:
     try:
-        result = subprocess.run(['dpkg', '-l'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[5:]
+            mapped_stdout = stdout_mapper(result.stdout.decode().splitlines())
             return [
-                {"name": pkg.split()[1], "version": pkg.split()[2], "source": "deb"}
-                for pkg in packages
+                {"name": get_name(line), "version": get_version(line), "source": source}
+                for line in mapped_stdout
             ]
         else:
-            print("Error retrieving Debian packages.")
+            print(f"failed to retrieve packages from {source}.")
             return []
     except Exception as e:
         print(f"Error: {e}")
         return []
 
-
-def get_linux_rpm_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['rpm', '-qa'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()
-            package_info = []
-            for pkg in packages:
-                info_result = subprocess.run(['rpm', '-qi', pkg], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if info_result.returncode == 0:
-                    pkg_info = info_result.stdout.decode().splitlines()
-                    for line in pkg_info:
-                        if line.startswith("Version"):
-                            package_info.append({"name": pkg, "version": line.split(":")[1].strip(), "source": "rpm"})
-                            break
-            return package_info
-        else:
-            print("Error retrieving RPM packages.")
-            return []
-    except Exception as e:
-        print(f"Error: {e}")
-        return []
-
-def get_linux_arch_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['pacman', '-Q'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()
-            return [
-                {"name": pkg.split()[0], "version": pkg.split()[1], "source": "arch"}
-                for pkg in packages
-            ]
-        else:
-            print("Error retrieving Arch packages.")
-            return []
-    except Exception as e:
-        print(f"Error: {e}")
-        return []
+def get_linux_debian_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["dpkg", "-l"],
+        source="deb",
+        stdout_mapper=lambda lines: lines[5:],
+        get_name=lambda line: line.split()[1],
+        get_version=lambda line: line.split()[2],
+    )
 
 
-def get_mac_brew_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['brew', 'list', '--versions'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()
-            return [
-                {"name": pkg.split()[0], "version": pkg.split()[1], "source": "brew"}
-                for pkg in packages
-            ]
-        else:
-            print("Error retrieving Homebrew packages.")
-            return []
-    except Exception as e:
-        print(f"Error: {e}")
-        return []
-    
-def get_windows_winget_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['winget', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[1:]
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "winget"}
-                for line in packages if len(line.split()) >= 2
-            ]
-        else:
-            print("Error retrieving winget packages.")
-            return []
-    except Exception as e:
-        print(f"Error: {e}")
-        return []
 
-def get_windows_installed_programs() -> list[Package]:
+def get_linux_rpm_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["rpm", "-qa"],
+        source="rpm",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line,
+        get_version=lambda line: subprocess.run(
+            ["rpm", "-q", "--qf", "%{VERSION}", line],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        ).stdout.decode().strip(),
+    )
+
+def get_linux_arch_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["pacman", "-Q"],
+        source="arch",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
+
+
+def get_mac_brew_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["brew", "list", "--versions"],
+        source="brew",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
+
+
+def get_windows_winget_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["winget", "list"],
+        source="winget",
+        stdout_mapper=lambda lines: lines[1:],  # Skip header
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1] if len(line.split()) > 1 else "",
+    )
+
+
+def get_windows_installed_programs() -> List[Package]:
+    import winreg
+
     try:
         programs = []
         for hive in [winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER]:
             key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-            try:
-                with winreg.OpenKey(hive, key_path) as key:
-                    for i in range(winreg.QueryInfoKey(key)[0]):
-                        subkey_name = winreg.EnumKey(key, i)
-                        with winreg.OpenKey(key, subkey_name) as subkey:
-                            try:
-                                name = winreg.QueryValueEx(subkey, 'DisplayName')[0]
-                                version = winreg.QueryValueEx(subkey, 'DisplayVersion')[0]
-                                programs.append({"name": name, "version": version, "source": "winreg"})
-                            except FileNotFoundError:
-                                pass
-            except FileNotFoundError:
-                continue
+            with winreg.OpenKey(hive, key_path) as key:
+                for i in range(winreg.QueryInfoKey(key)[0]):
+                    subkey_name = winreg.EnumKey(key, i)
+                    with winreg.OpenKey(key, subkey_name) as subkey:
+                        try:
+                            name = winreg.QueryValueEx(subkey, "DisplayName")[0]
+                            version = winreg.QueryValueEx(subkey, "DisplayVersion")[0]
+                            programs.append({"name": name, "version": version, "source": "winreg"})
+                        except FileNotFoundError:
+                            continue
         return programs
     except Exception as e:
         print(f"Error: {e}")
         return []
 
-def get_mac_nix_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['nix-env', '-q'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            return [
-                {"name": pkg.split()[0], "version": pkg.split()[1], "source": "Nix"}
-                for pkg in result.stdout.decode().splitlines()
-            ]
-        else:
-            print("Ошибка при получении пакетов Nix.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_mac_nix_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["nix-env", "-q"],
+        source="Nix",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
+
 
 
 def get_mac_setapp_apps() -> list[Package]:
@@ -152,6 +133,7 @@ def get_mac_applications() -> list[Package]:
     try:
         applications = os.listdir('/Applications')
         return [
+            # XXX
             {"name": app, "version": "", "source": "/Applications"}
             for app in applications if app.endswith('.app')
         ]
@@ -160,133 +142,79 @@ def get_mac_applications() -> list[Package]:
         return []
 
 
-def get_python_packages() -> list[Package]:
-    try:
-        result = subprocess.run([sys.executable, '-m', 'pip', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[2:]  # Skip headers
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "pip"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении Python пакетов.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_python_packages() -> List[Package]:
+    return get_packages_generic(
+        command=[sys.executable, "-m", "pip", "list"],
+        source="pip",
+        stdout_mapper=lambda lines: lines[2:],  # Skip headers
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
 
 
-def get_flatpak_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['flatpak', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            return [
-                {"name": pkg.split()[0], "version": pkg.split()[1], "source": "Flatpak"}
-                for pkg in result.stdout.decode().splitlines()
-            ]
-        else:
-            print("Ошибка при получении пакетов Flatpak.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_flatpak_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["flatpak", "list"],
+        source="Flatpak",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
 
-def get_snap_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['snap', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[1:]  # Skip header
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "Snap"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении пакетов Snap.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_snap_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["snap", "list"],
+        source="Snap",
+        stdout_mapper=lambda lines: lines[1:],  # Skip header
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
 
-def get_docker_images() -> list[Package]:
-    try:
-        result = subprocess.run(['docker', 'images'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[1:]  # Skip header
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "Docker"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении Docker образов.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_docker_images() -> List[Package]:
+    return get_packages_generic(
+        command=["docker", "images"],
+        source="Docker",
+        stdout_mapper=lambda lines: lines[1:],  # Skip header
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
 
-def get_helm_charts() -> list[Package]:
-    try:
-        result = subprocess.run(['helm', 'list', '--all-namespaces'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[1:]  # Skip header
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "Helm"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении Helm чартах.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_helm_charts() -> List[Package]:
+    return get_packages_generic(
+        command=["helm", "list", "--all-namespaces"],
+        source="Helm",
+        stdout_mapper=lambda lines: lines[1:],  # Skip header
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1],
+    )
 
-def get_node_packages() -> lambdaist[Package]:
-    try:
-        result = subprocess.run(['npm', 'list', '-g', '--depth=0'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()[1:]  # Skip header
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "npm"}
-                for line in packages if " " in line
-            ]
-        else:
-            print("Ошибка при получении пакетов npm.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_node_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["npm", "list", "-g", "--depth=0"],
+        source="npm",
+        stdout_mapper=lambda lines: lines[1:],  # Skip header
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1] if len(line.split()) > 1 else "",
+    )
 
-def get_yarn_packages() -> list[Package]:
-    try:
-        result = subprocess.run(['yarn', 'global', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()
-            return [
-                {"name": line.split()[0], "version": line.split()[1], "source": "Yarn"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении пакетов Yarn.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+def get_yarn_packages() -> List[Package]:
+    return get_packages_generic(
+        command=["yarn", "global", "list"],
+        source="Yarn",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1] if len(line.split()) > 1 else "",
+    )
 
 def get_ruby_gems() -> List[Package]:
-    try:
-        result = subprocess.run(['gem', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode == 0:
-            packages = result.stdout.decode().splitlines()
-            return [
-                {"name": line.split()[0], "version": line.split()[1][1:-1], "source": "RubyGems"}
-                for line in packages
-            ]
-        else:
-            print("Ошибка при получении Ruby gems.")
-            return []
-    except Exception as e:
-        print(f"Ошибка: {e}")
-        return []
+    return get_packages_generic(
+        command=["gem", "list"],
+        source="RubyGems",
+        stdout_mapper=lambda lines: lines,
+        get_name=lambda line: line.split()[0],
+        get_version=lambda line: line.split()[1][1:-1] if len(line.split()) > 1 else "",
+    )
+
 
 def get_cross_platform_packages() -> list[str]:
     """
