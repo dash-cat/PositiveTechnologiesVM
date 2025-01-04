@@ -1,5 +1,6 @@
 import os
 import plistlib
+import re
 import subprocess
 import sys
 
@@ -230,14 +231,19 @@ def get_yarn_packages() -> List[Package]:
     )
 
 def get_ruby_gems() -> List[Package]:
+    version_regex = re.compile(r'\(([^:]+):?\s*([^)]+)\)')
+    
     return get_packages_generic(
         command=["gem", "list"],
         source="RubyGems",
         stdout_mapper=lambda lines: lines,
         get_name=lambda line: line.split()[0],
-        get_version=lambda line: line.split()[1][1:-1] if len(line.split()) > 1 else "",
+        get_version=lambda line: (
+            version_match.group(2)
+            if (version_match := version_regex.search(line)) 
+            else ""
+        ),
     )
-
 
 def get_cross_platform_packages() -> list[str]:
     """

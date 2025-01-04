@@ -1,2 +1,3 @@
 to-send-old/*
 .venv/
+__pycache__
