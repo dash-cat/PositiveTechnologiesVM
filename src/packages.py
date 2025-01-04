@@ -1,8 +1,9 @@
 import os
+import plistlib
 import subprocess
 import sys
 
-from typing import Callable, List, TypedDict
+from typing import Callable, Dict, List, TypedDict
 
 class Package(TypedDict):
     name: str
@@ -118,27 +119,49 @@ def get_mac_nix_packages() -> List[Package]:
 
 
 
-def get_mac_setapp_apps() -> list[Package]:
+def get_app_version_openstep(app_path: str) -> str:
+    """Get the version of a .app on macOS using OpenStep-style plist."""
+    info_plist_path = os.path.join(app_path, 'Contents', 'Info.plist')
+    if os.path.exists(info_plist_path):
+        try:
+            with open(info_plist_path, 'rb') as plist_file:
+                plist_data = plistlib.load(plist_file, fmt=plistlib.FMT_XML)  # Handle OpenStep-style plist
+                return plist_data.get('CFBundleShortVersionString', 'Unknown version')
+        except Exception as e:
+            print(f"Error reading Info.plist for {app_path}: {e}")
+            return 'Error reading version'
+    else:
+        return 'Info.plist not found'
+
+def get_mac_setapp_apps() -> List[Dict[str, str]]:
+    """Get a list of Setapp applications with version numbers."""
     try:
         setapp_path = os.path.expanduser('~/Applications/Setapp')
         if os.path.exists(setapp_path):
-            return [{"name": app, "version": "", "source": "Setapp"} for app in os.listdir(setapp_path)]
+            apps = []
+            for app in os.listdir(setapp_path):
+                app_path = os.path.join(setapp_path, app)
+                version = get_app_version_openstep(app_path) if app.endswith('.app') else ''
+                apps.append({"name": app, "version": version, "source": "Setapp"})
+            return apps
         return []
     except Exception as e:
-        print(f"Ошибка при проверке Setapp приложений: {e}")
+        print(f"Error checking Setapp applications: {e}")
         return []
 
-
-def get_mac_applications() -> list[Package]:
+def get_mac_applications() -> List[Dict[str, str]]:
+    """Get a list of applications in /Applications with version numbers."""
     try:
         applications = os.listdir('/Applications')
-        return [
-            # XXX
-            {"name": app, "version": "", "source": "/Applications"}
-            for app in applications if app.endswith('.app')
-        ]
+        apps = []
+        for app in applications:
+            app_path = os.path.join('/Applications', app)
+            if app.endswith('.app'):
+                version = get_app_version_openstep(app_path)
+                apps.append({"name": app, "version": version, "source": "/Applications"})
+        return apps
     except Exception as e:
-        print(f"Ошибка при получении приложений macOS: {e}")
+        print(f"Error fetching macOS applications: {e}")
         return []
 
 
