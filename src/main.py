@@ -3,13 +3,20 @@ import pandas as pd
 from dash import Dash, dcc, html, dash_table
 import plotly.express as px
 
-from OS import OS, get_system
+from OS import get_system
 from packages import get_cross_platform_packages
 
+import time
 
 def main():
+    start_time = time.time()
+
     pkgs = get_system().get_packages()
     pkgs.extend(get_cross_platform_packages())
+
+    # Stop measuring time here
+    end_time = time.time()
+    elapsed_time = end_time - start_time
 
     df = pd.DataFrame(pkgs)
 
@@ -27,10 +34,14 @@ def main():
 
     app = Dash(__name__)
 
+    def header_line(text):
+        return html.Div(text, style={'fontSize': 20, 'margin': '10px'})
+
     app.layout = html.Div([
         html.H1("Package Report"),
         html.Div([
-            html.Div(f"Total Packages: {total_packages}", style={'fontSize': 20, 'margin': '10px'}),
+            header_line(f"Всего пакетов обнаружено: {total_packages}"),
+            header_line(f"Время сканирования: {elapsed_time:.2f} с"),
             dcc.Graph(figure=fig)
         ]),
         html.Div([
