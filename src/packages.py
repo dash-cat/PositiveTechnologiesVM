@@ -56,7 +56,6 @@ async def run_command_async(command: list[str]) -> list[str]:
         return []
 
 
-
 async def get_packages_generic_async(
     command: list[str],
     source: str,
@@ -184,15 +183,33 @@ def get_app_version_openstep(app_path: str) -> str:
     info_plist_path = os.path.join(app_path, 'Contents', 'Info.plist')
     if os.path.exists(info_plist_path):
         try:
-            with open(info_plist_path, 'rb') as plist_file:
-                plist_data = plistlib.load(plist_file, fmt=plistlib.FMT_XML)
-                return plist_data.get('CFBundleShortVersionString', 'Unknown version')
+            # Логируем команду перед её выполнением
+            command = ['defaults', 'read', info_plist_path, 'CFBundleShortVersionString']
+            logger.debug(f"Executing command: {' '.join(command)}")
+            
+            # Выполняем команду
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Логируем результат
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                logger.debug(f"Command succeeded for {app_path}: {version}")
+                return version
+            else:
+                logger.error(f"Defaults command failed for {app_path}: {result.stderr.strip()}")
+                return 'Error reading version'
         except Exception as e:
-            logger.error(f"Error reading Info.plist for {app_path}: {e}")
+            logger.error(f"Error executing defaults command for {app_path}: {e}")
             return 'Error reading version'
     else:
         logger.warning(f"Info.plist not found for {app_path}")
         return 'Info.plist not found'
+
 
 def get_mac_setapp_apps() -> List[Dict[str, str]]:
     try:
@@ -202,8 +219,9 @@ def get_mac_setapp_apps() -> List[Dict[str, str]]:
             apps = []
             for app in os.listdir(setapp_path):
                 app_path = os.path.join(setapp_path, app)
-                version = get_app_version_openstep(app_path) if app.endswith('.app') else ''
+                version = get_app_version_openstep(app_path) if app.endswith('.app') else 'Unknown'
                 apps.append({"name": app, "version": version, "source": "Setapp"})
+                logger.debug(f"Processed Setapp application: {app} with version: {version}")
             logger.info(f"Found {len(apps)} Setapp applications")
             return apps
         logger.warning("Setapp directory not found")
@@ -222,11 +240,13 @@ def get_mac_applications() -> List[Dict[str, str]]:
             if app.endswith('.app'):
                 version = get_app_version_openstep(app_path)
                 apps.append({"name": app, "version": version, "source": "/Applications"})
+                logger.debug(f"Processed application: {app} with version: {version}")
         logger.info(f"Found {len(apps)} macOS applications")
         return apps
     except Exception as e:
         logger.error(f"Error fetching macOS applications: {e}")
         return []
+
 
 def get_python_packages() -> List[Package]:
     return get_packages_generic(
@@ -271,16 +291,6 @@ def get_helm_charts() -> List[Package]:
         stdout_mapper=lambda lines: lines[1:],  # Skip header
         get_name=lambda line: line.split()[0],
         get_version=lambda line: line.split()[1],
-    )
-
-def get_node_packages() -> List[Package]:
-    logger.info("Fetching npm packages")
-    return get_packages_generic(
-        command=["npm", "list", "-g", "--depth=0"],
-        source="npm",
-        stdout_mapper=lambda lines: [line for line in lines if line.strip()],
-        get_name=lambda line: line.split("@")[0],
-        get_version=lambda line: line.split("@")[1] if "@" in line else "unknown",
     )
 
 def get_yarn_packages() -> List[Package]:
@@ -330,7 +340,7 @@ def get_appimage_apps() -> List[Package]:
     try:
         logger.info("Searching for AppImage applications")
         appimage_paths = subprocess.run(
-            ["find", "/", "-type", "f", "-name", "*.AppImage"],
+            ["find", "/opt", "-type", "f", "-name", "*.AppImage"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=30
@@ -388,16 +398,28 @@ async def get_cross_platform_packages() -> list[str]:
     tasks = [
         get_packages_generic_async(["dpkg", "-l"], "deb", lambda lines: lines[5:], lambda line: line.split()[1], lambda line: line.split()[2]),
         get_packages_generic_async([sys.executable, "-m", "pip", "list"], "pip", lambda lines: lines[2:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["npm", "list", "-g", "--depth=0"], "npm", lambda lines: [line.strip() for line in lines if line.strip()], lambda line: line.split("@")[0], lambda line: line.split("@")[1] if "@" in line else "unknown"),
+        # get_packages_generic_async(["npm", "list", "-g", "--depth=0"], "npm", lambda lines: [line.strip() for line in lines if line.strip()], lambda line: line.split("@")[0], lambda line: line.split("@")[1] if "@" in line else "unknown"),
         get_packages_generic_async(["gem", "list"], "RubyGems", lambda lines: lines, lambda line: line.split()[0], lambda line: (re.search(r'\(([^:]+):?\s*([^)]+)\)', line).group(2) if re.search(r'\(([^:]+):?\s*([^)]+)\)', line) else "")),
         get_packages_generic_async(["conda", "list", "--json"], "conda", lambda lines: eval("".join(lines)), lambda pkg: pkg["name"], lambda pkg: pkg["version"]),
         get_packages_generic_async(["flatpak", "list"], "Flatpak", lambda lines: lines, lambda line: line.split()[0], lambda line: line.split()[1]),
         get_packages_generic_async(["snap", "list"], "Snap", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
         get_packages_generic_async(["docker", "images"], "Docker", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
         get_packages_generic_async(["helm", "list", "--all-namespaces"], "Helm", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["find", "~/Downloads", "/opt", "-type", "f", "-name", "*.AppImage"], "AppImage", lambda lines: lines, lambda line: os.path.basename(line), lambda line: "unknown"),
+        get_packages_generic_async(["find", "/opt", "-type", "f", "-name", "*.AppImage"], "AppImage", lambda lines: lines, lambda line: os.path.basename(line), lambda line: "unknown"),
         get_packages_generic_async(["brew", "list", "--versions"], "brew", lambda lines: lines, lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["ls", "/Applications"], "macOS Apps", lambda lines: lines, lambda line: line.split()[0], lambda line: "unknown")
+        # get_packages_generic_async(["ls", "/Applications"], "macOS Apps", lambda lines: lines, lambda line: line.split()[0], lambda line: "unknown")
+        get_packages_generic_async(
+            ["npm", "list", "-g", "--depth=0"],
+            "npm",
+            lambda lines: [
+                line.strip() 
+                for line in lines 
+                if line.strip() and re.search(r"(?:──\s+|^)(@?.*?)\s*@", line) and re.search(r"@([\d.]+)$", line)
+            ],
+            lambda line: re.search(r"(?:──\s+|^)(@?.*?)\s*@", line).group(1).strip(),
+            lambda line: re.search(r"@([\d.]+)$", line).group(1).strip()
+        )
+
     ]
     start_time = time.time()
     results = await asyncio.gather(*tasks)
