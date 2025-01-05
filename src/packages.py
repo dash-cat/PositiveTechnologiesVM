@@ -56,6 +56,7 @@ async def run_command_async(command: list[str]) -> list[str]:
         return []
 
 
+
 async def get_packages_generic_async(
     command: list[str],
     source: str,
@@ -183,33 +184,15 @@ def get_app_version_openstep(app_path: str) -> str:
     info_plist_path = os.path.join(app_path, 'Contents', 'Info.plist')
     if os.path.exists(info_plist_path):
         try:
-            # Логируем команду перед её выполнением
-            command = ['defaults', 'read', info_plist_path, 'CFBundleShortVersionString']
-            logger.debug(f"Executing command: {' '.join(command)}")
-            
-            # Выполняем команду
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            
-            # Логируем результат
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                logger.debug(f"Command succeeded for {app_path}: {version}")
-                return version
-            else:
-                logger.error(f"Defaults command failed for {app_path}: {result.stderr.strip()}")
-                return 'Error reading version'
+            with open(info_plist_path, 'rb') as plist_file:
+                plist_data = plistlib.load(plist_file, fmt=plistlib.FMT_XML)
+                return plist_data.get('CFBundleShortVersionString', 'Unknown version')
         except Exception as e:
-            logger.error(f"Error executing defaults command for {app_path}: {e}")
+            logger.error(f"Error reading Info.plist for {app_path}: {e}")
             return 'Error reading version'
     else:
         logger.warning(f"Info.plist not found for {app_path}")
         return 'Info.plist not found'
-
 
 def get_mac_setapp_apps() -> List[Dict[str, str]]:
     try:
@@ -219,9 +202,8 @@ def get_mac_setapp_apps() -> List[Dict[str, str]]:
             apps = []
             for app in os.listdir(setapp_path):
                 app_path = os.path.join(setapp_path, app)
-                version = get_app_version_openstep(app_path) if app.endswith('.app') else 'Unknown'
+                version = get_app_version_openstep(app_path) if app.endswith('.app') else ''
                 apps.append({"name": app, "version": version, "source": "Setapp"})
-                logger.debug(f"Processed Setapp application: {app} with version: {version}")
             logger.info(f"Found {len(apps)} Setapp applications")
             return apps
         logger.warning("Setapp directory not found")
@@ -240,13 +222,11 @@ def get_mac_applications() -> List[Dict[str, str]]:
             if app.endswith('.app'):
                 version = get_app_version_openstep(app_path)
                 apps.append({"name": app, "version": version, "source": "/Applications"})
-                logger.debug(f"Processed application: {app} with version: {version}")
         logger.info(f"Found {len(apps)} macOS applications")
         return apps
     except Exception as e:
         logger.error(f"Error fetching macOS applications: {e}")
         return []
-
 
 def get_python_packages() -> List[Package]:
     return get_packages_generic(
@@ -291,6 +271,16 @@ def get_helm_charts() -> List[Package]:
         stdout_mapper=lambda lines: lines[1:],  # Skip header
         get_name=lambda line: line.split()[0],
         get_version=lambda line: line.split()[1],
+    )
+
+def get_node_packages() -> List[Package]:
+    logger.info("Fetching npm packages")
+    return get_packages_generic(
+        command=["npm", "list", "-g", "--depth=0"],
+        source="npm",
+        stdout_mapper=lambda lines: [line for line in lines if line.strip()],
+        get_name=lambda line: line.split("@")[0],
+        get_version=lambda line: line.split("@")[1] if "@" in line else "unknown",
     )
 
 def get_yarn_packages() -> List[Package]:
