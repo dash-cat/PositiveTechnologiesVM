@@ -8,8 +8,13 @@ from packages import (
     get_linux_rpm_packages,
     get_mac_applications,
     get_mac_brew_packages,
+    get_mac_setapp_apps,
+    get_mac_nix_packages,
     get_windows_winget_packages,
     get_windows_installed_programs,
+    get_python_packages,
+    get_node_packages,
+    get_ruby_gems,
 )
 
 
@@ -23,10 +28,32 @@ class OS:
 debian = OS(family="linux", get_packages=get_linux_debian_packages)
 rpm_based = OS(family="linux", get_packages=get_linux_rpm_packages)
 arch_based = OS(family="linux", get_packages=get_linux_arch_packages)
-macos = OS(family="darwin", get_packages=lambda: get_mac_brew_packages() + get_mac_applications())
+
+macos = OS(
+    family="darwin",
+    get_packages=lambda: (
+        get_mac_brew_packages()
+        + get_mac_applications()
+        + get_mac_setapp_apps()
+        + get_mac_nix_packages()
+    ),
+)
+
 windows = OS(
     family="windows",
-    get_packages=lambda: get_windows_winget_packages() + get_windows_installed_programs(),
+    get_packages=lambda: (
+        get_windows_winget_packages()
+        + get_windows_installed_programs()
+    ),
+)
+
+cross_platform = OS(
+    family="cross-platform",
+    get_packages=lambda: (
+        get_python_packages()
+        + get_node_packages()
+        + get_ruby_gems()
+    ),
 )
 
 
