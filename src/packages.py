@@ -276,11 +276,15 @@ def get_helm_charts() -> List[Package]:
 def get_node_packages() -> List[Package]:
     logger.info("Fetching npm packages")
     return get_packages_generic(
-        command=["npm", "list", "-g", "--depth=0"],
-        source="npm",
-        stdout_mapper=lambda lines: [line for line in lines if line.strip()],
-        get_name=lambda line: line.split("@")[0],
-        get_version=lambda line: line.split("@")[1] if "@" in line else "unknown",
+        ["npm", "list", "-g", "--depth=0"],
+        "npm",
+        lambda lines: [
+            line.strip() 
+            for line in lines 
+            if line.strip() and re.search(r"(?:──\s+|^)(@?.*?)\s*@", line) and re.search(r"@([\d.]+)$", line)
+        ],
+        lambda line: re.search(r"(?:──\s+|^)(@?.*?)\s*@", line).group(1).strip(),
+        lambda line: re.search(r"@([\d.]+)$", line).group(1).strip()
     )
 
 def get_yarn_packages() -> List[Package]:
@@ -386,30 +390,16 @@ def get_flatpak_runtime_packages() -> List[Package]:
 
 async def get_cross_platform_packages() -> list[str]:
     tasks = [
-        get_packages_generic_async(["dpkg", "-l"], "deb", lambda lines: lines[5:], lambda line: line.split()[1], lambda line: line.split()[2]),
-        get_packages_generic_async([sys.executable, "-m", "pip", "list"], "pip", lambda lines: lines[2:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        # get_packages_generic_async(["npm", "list", "-g", "--depth=0"], "npm", lambda lines: [line.strip() for line in lines if line.strip()], lambda line: line.split("@")[0], lambda line: line.split("@")[1] if "@" in line else "unknown"),
-        get_packages_generic_async(["gem", "list"], "RubyGems", lambda lines: lines, lambda line: line.split()[0], lambda line: (re.search(r'\(([^:]+):?\s*([^)]+)\)', line).group(2) if re.search(r'\(([^:]+):?\s*([^)]+)\)', line) else "")),
-        get_packages_generic_async(["conda", "list", "--json"], "conda", lambda lines: eval("".join(lines)), lambda pkg: pkg["name"], lambda pkg: pkg["version"]),
-        get_packages_generic_async(["flatpak", "list"], "Flatpak", lambda lines: lines, lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["snap", "list"], "Snap", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["docker", "images"], "Docker", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["helm", "list", "--all-namespaces"], "Helm", lambda lines: lines[1:], lambda line: line.split()[0], lambda line: line.split()[1]),
-        get_packages_generic_async(["find", "/opt", "-type", "f", "-name", "*.AppImage"], "AppImage", lambda lines: lines, lambda line: os.path.basename(line), lambda line: "unknown"),
-        get_packages_generic_async(["brew", "list", "--versions"], "brew", lambda lines: lines, lambda line: line.split()[0], lambda line: line.split()[1]),
-        # get_packages_generic_async(["ls", "/Applications"], "macOS Apps", lambda lines: lines, lambda line: line.split()[0], lambda line: "unknown")
-        get_packages_generic_async(
-            ["npm", "list", "-g", "--depth=0"],
-            "npm",
-            lambda lines: [
-                line.strip() 
-                for line in lines 
-                if line.strip() and re.search(r"(?:──\s+|^)(@?.*?)\s*@", line) and re.search(r"@([\d.]+)$", line)
-            ],
-            lambda line: re.search(r"(?:──\s+|^)(@?.*?)\s*@", line).group(1).strip(),
-            lambda line: re.search(r"@([\d.]+)$", line).group(1).strip()
-        )
-
+        asyncio.to_thread(get_python_packages),
+        asyncio.to_thread(get_ruby_gems),
+        asyncio.to_thread(get_conda_packages),
+        asyncio.to_thread(get_flatpak_packages),
+        asyncio.to_thread(get_snap_packages),
+        asyncio.to_thread(get_docker_images),
+        asyncio.to_thread(get_helm_charts),
+        asyncio.to_thread(get_appimage_apps),
+        asyncio.to_thread(get_mac_brew_packages),
+        asyncio.to_thread(get_node_packages),
     ]
     start_time = time.time()
     results = await asyncio.gather(*tasks)
